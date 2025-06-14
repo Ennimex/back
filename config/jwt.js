@@ -1,3 +1,5 @@
+// config/jwt.js
+// Este archivo maneja la generación y verificación de tokens JWT
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 

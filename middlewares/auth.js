@@ -1,5 +1,6 @@
 // este archivo maneja la autenticación de usuarios
 // y la creación de nuevos usuarios en la base de datos
+// middlewares/auth.js
 const { verifyToken } = require('../config/jwt');
 
 const authenticate = (req, res, next) => {
