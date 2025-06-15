@@ -1,5 +1,4 @@
-// admin.js
-// Este archivo contiene las rutas de administración para la API.
+// routes/admin.js
 const express = require('express');
 const router = express.Router();
 const { authenticate, checkRole } = require('../middlewares/auth');
@@ -12,14 +11,14 @@ router.use(authenticate, checkRole(['admin']));
 router.get('/dashboard', async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
-    
+
     res.json({
       message: `Bienvenido, ${req.user.role}`,
       stats: {
         totalUsers,
         totalSales: 0,
-        totalOrders: 0
-      }
+        totalOrders: 0,
+      },
     });
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener datos del dashboard' });
@@ -29,7 +28,7 @@ router.get('/dashboard', async (req, res) => {
 // Obtener todos los usuarios
 router.get('/users', async (req, res) => {
   try {
-    const users = await User.find({}, '-password');
+    const users = await User.find({});
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener usuarios' });
@@ -49,7 +48,7 @@ router.put('/users/:userId/role', async (req, res) => {
     const user = await User.findByIdAndUpdate(
       userId,
       { role },
-      { new: true, select: '-password' }
+      { new: true }
     );
 
     if (!user) {
@@ -67,7 +66,7 @@ router.delete('/users/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const user = await User.findByIdAndDelete(userId);
-    
+
     if (!user) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }

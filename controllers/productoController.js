@@ -93,7 +93,10 @@ const createProducto = async (req, res) => {
             // Create and save the product
             const nuevoProducto = new Producto(productData);
             const productoGuardado = await nuevoProducto.save();
-            res.status(201).json(productoGuardado);
+            res.status(201).json({
+              mensaje: "Producto creado correctamente",
+              producto: productoGuardado
+            });
           } catch (saveError) {
             console.error("Error al guardar producto:", saveError);
             res.status(400).json({
@@ -109,7 +112,10 @@ const createProducto = async (req, res) => {
       // No file uploaded, save product directly
       const nuevoProducto = new Producto(productData);
       const productoGuardado = await nuevoProducto.save();
-      res.status(201).json(productoGuardado);
+      res.status(201).json({
+        mensaje: "Producto creado correctamente",
+        producto: productoGuardado
+      });
     }
   } catch (error) {
     console.error("Error general en createProducto:", error);
