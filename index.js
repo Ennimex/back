@@ -13,6 +13,7 @@ const adminRoutes = require("./routes/admin");
 const publicContenidoRoutes = require("./routes/publicContenido");
 const adminContenidoRoutes = require("./routes/adminContenido");
 const productoRoutes = require("./routes/productoRoutes");
+const tallasRoutes = require("./routes/tallasRoutes");
 
 // Inicializar la aplicación Express
 const app = express();
@@ -30,12 +31,14 @@ db.connect();
 app.use("/api/auth", authRoutes); // Login/registro
 
 // Rutas protegidas (requieren JWT)
-app.use("/api/admin", adminRoutes); // Ejemplo: /api/admin/dashboard
-app.use("/api/upload", uploadRoutes); // Tus rutas de subida
+app.use("/api/admin", adminRoutes);
+app.use("/api/upload", uploadRoutes);
 app.use("/api/public", publicContenidoRoutes);
 app.use("/api/admin/content", adminContenidoRoutes);
 // Rutas de productos
 app.use("/api/productos", productoRoutes);
+// Rutas de tallas
+app.use("/api/tallas", tallasRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {

@@ -55,16 +55,31 @@ router.get('/localidades', async (req, res) => {
   }
 });
 
-// Ruta para obtener todas las tallas con su categoría
+// Ruta pública para obtener todas las tallas con su categoría
 router.get('/tallas', async (req, res) => {
   try {
     const tallas = await Tallas.find().populate('categoriaId');
     res.json(tallas);
   } catch (error) {
-    res.status(500).json({ error: 'Error al obtener tallas' });
+    res.status(500).json({ 
+      error: 'Error al obtener tallas',
+      detalles: error.message 
+    });
   }
 });
 
+// Ruta pública para obtener todas las categorías
+router.get('/categorias', async (req, res) => {
+  try {
+    const categorias = await Categorias.find();
+    res.json(categorias);
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Error al obtener categorías',
+      detalles: error.message 
+    });
+  }
+});
 
 // Obtener información de contacto
 router.get('/contacto', async (req, res) => {
@@ -73,16 +88,6 @@ router.get('/contacto', async (req, res) => {
     res.json(contacto || {});
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener información de contacto' });
-  }
-});
-
-// obtener todas las categorías
-router.get('/categorias', async (req, res) => {
-  try {
-    const categorias = await Categorias.find();
-    res.json(categorias);
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener categorías' });
   }
 });
 
