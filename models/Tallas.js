@@ -4,7 +4,8 @@ const mongoose = require('mongoose');
 const TallaSchema = new mongoose.Schema({
   _id: String,
   categoriaId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: String,
+    required: true,
     ref: 'Categorias'
   },
   genero: String,

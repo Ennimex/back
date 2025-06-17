@@ -55,15 +55,16 @@ router.get('/localidades', async (req, res) => {
   }
 });
 
-// obtener tallas disponibles
+// Ruta para obtener todas las tallas con su categoría
 router.get('/tallas', async (req, res) => {
   try {
-    const tallas = await Tallas.find();
+    const tallas = await Tallas.find().populate('categoriaId');
     res.json(tallas);
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener tallas' });
   }
 });
+
 
 // Obtener información de contacto
 router.get('/contacto', async (req, res) => {

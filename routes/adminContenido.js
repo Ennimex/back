@@ -34,7 +34,7 @@ router.put("/nosotros", async (req, res) => {
   }
 });
 
-// RUTAS PARA SERVICIOS
+// Rutas para obtener la infromacion de servicios
 router.post("/servicios", async (req, res) => {
   try {
     const servicio = new Servicio(req.body);
@@ -45,6 +45,7 @@ router.post("/servicios", async (req, res) => {
   }
 });
 
+// Rutas para actualizar un servicio
 router.put("/servicios/:id", async (req, res) => {
   try {
     const servicio = await Servicio.findByIdAndUpdate(req.params.id, req.body, {
@@ -59,6 +60,7 @@ router.put("/servicios/:id", async (req, res) => {
   }
 });
 
+// Rutas para eliminar un servicio
 router.delete("/servicios/:id", async (req, res) => {
   try {
     const servicio = await Servicio.findByIdAndDelete(req.params.id);
@@ -141,5 +143,74 @@ router.get("/categorias", async (req, res) => {
     res.status(500).json({ error: "Error al obtener categorías" });
   }
 });
+
+//Ruta para crear una nueva talla
+
+//obtener solo una talla
+// GET /api/tallas/:id
+router.get('/tallas/:id', async (req, res) => {
+  try {
+    const talla = await Tallas.findById(req.params.id).populate('categoriaId');
+    if (!talla) return res.status(404).json({ error: 'Talla no encontrada' });
+    res.json(talla);
+  } catch (error) {
+    res.status(500).json({ error: 'Error al buscar la talla' });
+  }
+});
+
+// crear una nueva talla
+router.post('/tallas', async (req, res) => {
+  try {
+    const nuevaTalla = new Tallas(req.body);
+    await nuevaTalla.save();
+    res.status(201).json(nuevaTalla);
+  } catch (error) {
+    res.status(400).json({ error: 'Error al crear la talla' });
+  }
+});
+
+// actualizar una talla existente
+router.put('/tallas/:id', async (req, res) => {
+  try {
+    const tallaActualizada = await Tallas.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    if (!tallaActualizada) return res.status(404).json({ error: 'Talla no encontrada' });
+    res.json(tallaActualizada);
+  } catch (error) {
+    res.status(400).json({ error: 'Error al actualizar la talla' });
+  }
+});
+
+// eliminar una tallas
+router.delete('/tallas/:id', async (req, res) => {
+  try {
+    const tallaEliminada = await Tallas.findByIdAndDelete(req.params.id);
+    if (!tallaEliminada) return res.status(404).json({ error: 'Talla no encontrada' });
+    res.json({ mensaje: 'Talla eliminada correctamente' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al eliminar la talla' });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 module.exports = router;
