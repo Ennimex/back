@@ -14,6 +14,7 @@ const publicContenidoRoutes = require("./routes/publicContenido");
 const adminContenidoRoutes = require("./routes/adminContenido");
 const productoRoutes = require("./routes/productoRoutes");
 const tallasRoutes = require("./routes/tallasRoutes");
+const categoriasRoutes = require("./routes/categoriasRoutes");
 
 // Inicializar la aplicación Express
 const app = express();
@@ -39,6 +40,8 @@ app.use("/api/admin/content", adminContenidoRoutes);
 app.use("/api/productos", productoRoutes);
 // Rutas de tallas
 app.use("/api/tallas", tallasRoutes);
+// Rutas de categorías
+app.use("/api/categorias", categoriasRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {
