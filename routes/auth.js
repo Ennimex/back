@@ -13,7 +13,14 @@ router.post('/login', async (req, res) => {
     }
 
     const token = user.getSignedJwtToken();
-    res.json({ token, user: { role: user.role, email: user.email, name: user.name } });
+    const expiresIn = process.env.JWT_EXPIRE;
+    
+    res.json({ 
+      token, 
+      user: { role: user.role, email: user.email, name: user.name },
+      expiresIn,
+      tokenExpiration: new Date(Date.now() + parseInt(expiresIn) * 60 * 1000).getTime()
+    });
   } catch (error) {
     res.status(500).json({ error: 'Error en el servidor' });
   }

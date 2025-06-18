@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 const CategoriaSchema = new mongoose.Schema({
-  _id: String,
+  _id: String,  // Cambiamos a String para permitir IDs como "ADT"
   nombre: String,
   descripcion: String,
   imagenURL: String

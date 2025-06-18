@@ -5,7 +5,7 @@ const ProductoSchema = new mongoose.Schema({
   nombre: String,
   descripcion: String,
   localidadId: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
     ref: "Localidades",
     required: true
   },
@@ -13,7 +13,7 @@ const ProductoSchema = new mongoose.Schema({
   imagenURL: String,
   tallasDisponibles: [
     {
-      type: String,
+      type: String, // Cambiamos a String ya que las Tallas usan _id String
       ref: "Tallas"
     }
   ]

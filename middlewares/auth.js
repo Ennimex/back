@@ -5,14 +5,26 @@ const { verifyToken } = require('../config/jwt');
 
 const authenticate = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1]; // Bearer <token>
-  if (!token) return res.status(401).json({ error: 'No autorizado' });
+  if (!token) return res.status(401).json({ 
+    error: 'No autorizado',
+    isExpired: false
+  });
 
   try {
     const decoded = verifyToken(token);
     req.user = decoded; // { id, role }
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Token inválido' });
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        error: 'Token expirado',
+        isExpired: true
+      });
+    }
+    res.status(401).json({ 
+      error: 'Token inválido',
+      isExpired: false
+    });
   }
 };
 

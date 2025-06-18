@@ -2,9 +2,9 @@
 const mongoose = require('mongoose');
 
 const TallaSchema = new mongoose.Schema({
-  _id: String,
+  _id: String, // Mantenemos el _id como String
   categoriaId: {
-    type: String,
+    type: String,  // Cambiamos a String para coincidir con el _id de Categorias
     required: true,
     ref: 'Categorias'
   },

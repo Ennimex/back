@@ -20,35 +20,64 @@ const getCategorias = async (req, res) => {
 
 const createCategoria = async (req, res) => {
     try {
+        console.log('Iniciando creación de categoría');
+        console.log('Datos recibidos:', req.body);
+        
         const { _id, nombre, descripcion } = req.body;
+        
+        // Validar que se proporcione un ID personalizado
+        if (!_id) {
+            return res.status(400).json({
+                error: "Es necesario proporcionar un ID personalizado",
+                detalles: "El campo _id es requerido"
+            });
+        }
+
+        // Verificar si ya existe una categoría con ese ID
+        const categoriaExistente = await Categoria.findById(_id);
+        if (categoriaExistente) {
+            return res.status(400).json({
+                error: "ID de categoría ya existe",
+                detalles: "Por favor, utiliza un ID único"
+            });
+        }
+
         const categoriaData = {
             _id,
             nombre,
             descripcion,
             imagenURL: req.body.imagenURL || ""
         };
+        
+        console.log('Datos procesados:', categoriaData);
 
         if (req.file) {
+            console.log('Archivo detectado, iniciando carga a Cloudinary');
             const uploadStream = cloudinary.uploader.upload_stream(
                 { folder: "categorias" },
                 async (error, result) => {
                     if (error) {
+                        console.error('Error en Cloudinary:', error);
                         return res.status(500).json({
                             error: "Error al subir la imagen",
                             detalles: error.message
                         });
                     }
 
+                    console.log('Imagen subida exitosamente a Cloudinary:', result.secure_url);
                     categoriaData.imagenURL = result.secure_url;
 
                     try {
                         const nuevaCategoria = new Categoria(categoriaData);
+                        console.log('Intentando guardar categoría:', nuevaCategoria);
                         const categoriaGuardada = await nuevaCategoria.save();
+                        console.log('Categoría guardada exitosamente:', categoriaGuardada);
                         res.status(201).json({
                             mensaje: "Categoría creada correctamente",
                             categoria: categoriaGuardada
                         });
                     } catch (saveError) {
+                        console.error('Error al guardar la categoría:', saveError);
                         res.status(400).json({
                             error: "Error al crear categoría",
                             detalles: saveError.message
@@ -59,14 +88,17 @@ const createCategoria = async (req, res) => {
 
             streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
         } else {
+            console.log('No se detectó archivo, guardando categoría sin imagen');
             const nuevaCategoria = new Categoria(categoriaData);
             const categoriaGuardada = await nuevaCategoria.save();
+            console.log('Categoría guardada exitosamente:', categoriaGuardada);
             res.status(201).json({
                 mensaje: "Categoría creada correctamente",
                 categoria: categoriaGuardada
             });
         }
     } catch (error) {
+        console.error('Error general en createCategoria:', error);
         res.status(500).json({
             error: "Error al crear categoría",
             detalles: error.message
