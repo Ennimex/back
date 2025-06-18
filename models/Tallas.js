@@ -1,20 +1,21 @@
-// Talla.js
 const mongoose = require('mongoose');
 
 const TallaSchema = new mongoose.Schema({
-  _id: String, // Mantenemos el _id como String
   categoriaId: {
-    type: String,  // Cambiamos a String para coincidir con el _id de Categorias
-    required: true,
-    ref: 'Categorias'
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Categoria',
+    required: true
   },
-  genero: String,
-  talla: String,
+  genero: { type: String, required: true },
+  talla: { type: String, required: true },
   rangoEdad: String,
   medida: String
 });
 
-// Agregamos indices para mejorar el rendimiento de las consultas
+// Índices
 TallaSchema.index({ categoriaId: 1 });
+TallaSchema.index({ genero: 1 });
+TallaSchema.index({ talla: 1 });
+TallaSchema.index({ categoriaId: 1, genero: 1, talla: 1 }, { unique: true });
 
 module.exports = mongoose.model('Tallas', TallaSchema);

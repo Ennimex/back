@@ -1,26 +1,24 @@
-// models/ Producto.js
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const ProductoSchema = new mongoose.Schema({
-  nombre: String,
+  nombre: { type: String, required: true },
   descripcion: String,
-  localidadId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Localidades",
-    required: true
-  },
   tipoTela: String,
   imagenURL: String,
-  tallasDisponibles: [
-    {
-      type: String, // Cambiamos a String ya que las Tallas usan _id String
-      ref: "Tallas"
-    }
-  ]
+  localidadId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Localidades',
+    required: true
+  },
+  tallasDisponibles: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tallas'
+  }]
 });
 
-// Agregamos índices para mejorar el rendimiento de las consultas
+// Índices
+ProductoSchema.index({ nombre: 'text', descripcion: 'text' });
 ProductoSchema.index({ localidadId: 1 });
 ProductoSchema.index({ tallasDisponibles: 1 });
 
-module.exports = mongoose.model("Producto", ProductoSchema);
+module.exports = mongoose.model('Producto', ProductoSchema);

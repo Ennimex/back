@@ -5,9 +5,10 @@ const router = express.Router();
 const Nosotros = require('../models/Nosotros');
 const Servicio = require('../models/Servicio');
 const Contacto = require('../models/Contacto');
-const Localidad = require('../models/Localidad');
+const Localidad = require('../models/Localidades');
 const Tallas = require('../models/Tallas');
 const Categorias = require("../models/Categorias");
+const Producto = require('../models/Producto');
 
 
 // Middleware para todas las rutas (no requiere autenticación)
@@ -88,6 +89,26 @@ router.get('/contacto', async (req, res) => {
     res.json(contacto || {});
   } catch (error) {
     res.status(500).json({ error: 'Error al obtener información de contacto' });
+  }
+});
+
+// Ruta pública para obtener todos los productos con sus relaciones
+router.get('/productos', async (req, res) => {
+  try {
+    const productos = await Producto.find()
+      .populate('localidadId')
+      .populate({
+        path: 'tallasDisponibles',
+        populate: {
+          path: 'categoriaId'
+        }
+      });
+    res.json(productos);
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Error al obtener productos',
+      detalles: error.message 
+    });
   }
 });
 

@@ -1,4 +1,5 @@
 const Talla = require("../models/Tallas");
+const mongoose = require('mongoose');
 
 // Obtener todas las tallas
 const getTallas = async (req, res) => {
@@ -17,9 +18,14 @@ const getTallas = async (req, res) => {
 // Crear nueva talla
 const createTalla = async (req, res) => {
     try {
-        const { _id, categoriaId, genero, talla, rangoEdad, medida } = req.body;
+        const { categoriaId, genero, talla, rangoEdad, medida } = req.body;
+        if (!mongoose.Types.ObjectId.isValid(categoriaId)) {
+            return res.status(400).json({
+                error: "ID de categoría inválido"
+            });
+        }
+
         const nuevaTalla = new Talla({
-            _id,
             categoriaId,
             genero,
             talla,
@@ -44,6 +50,18 @@ const createTalla = async (req, res) => {
 // Actualizar talla
 const updateTalla = async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({
+                error: "ID de talla inválido"
+            });
+        }
+
+        if (req.body.categoriaId && !mongoose.Types.ObjectId.isValid(req.body.categoriaId)) {
+            return res.status(400).json({
+                error: "ID de categoría inválido"
+            });
+        }
+
         const { id } = req.params;
         const tallaActualizada = await Talla.findByIdAndUpdate(
             id,

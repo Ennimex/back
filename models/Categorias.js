@@ -1,11 +1,17 @@
-//categoria.js
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const CategoriaSchema = new mongoose.Schema({
-  _id: String,  // Cambiamos a String para permitir IDs como "ADT"
-  nombre: String,
-  descripcion: String,
-  imagenURL: String
+  nombre: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  descripcion: {
+    type: String
+  },
+  imagenURL: {
+    type: String
+  }
 });
 
-module.exports = mongoose.model('Categorias', CategoriaSchema);
+module.exports = mongoose.model("Categoria", CategoriaSchema);

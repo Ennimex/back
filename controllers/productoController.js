@@ -5,6 +5,7 @@ const cloudinary = require("../config/cloudinaryConfig");
 const streamifier = require("streamifier"); // importar para manejar streams
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
+const mongoose = require('mongoose');
 
 // Obtener todos los productos con referencias pobladas
 const getProductos = async (req, res) => {
@@ -41,24 +42,26 @@ const getProductos = async (req, res) => {
 // Crear nuevo producto con subida de imagen a Cloudinary
 const createProducto = async (req, res) => {
   try {
-    // Parse tallasDisponibles as an array
+    // Validar ObjectId para localidadId
+    if (!mongoose.Types.ObjectId.isValid(req.body.localidadId)) {
+      return res.status(400).json({
+        error: "ID de localidad inválido"
+      });
+    }
+
+    // Validar array de tallasDisponibles
     let tallasDisponibles = req.body.tallasDisponibles;
     if (typeof tallasDisponibles === "string") {
       tallasDisponibles = [tallasDisponibles];
-    } else if (!Array.isArray(tallasDisponibles)) {
-      tallasDisponibles = tallasDisponibles ? [tallasDisponibles] : [];
     }
 
-    // Validate that each talla ID exists in the database
-    if (tallasDisponibles.length > 0) {
-      const validTallas = await Talla.find({ _id: { $in: tallasDisponibles } });
-      if (validTallas.length !== tallasDisponibles.length) {
-        const invalidIds = tallasDisponibles.filter(
-          id => !validTallas.some(talla => talla._id.toString() === id)
-        );
+    // Validar que cada ID de talla sea un ObjectId válido
+    if (tallasDisponibles && tallasDisponibles.length > 0) {
+      const invalidTallas = tallasDisponibles.filter(id => !mongoose.Types.ObjectId.isValid(id));
+      if (invalidTallas.length > 0) {
         return res.status(400).json({
-          error: "Tallas inválidas",
-          detalles: `Los siguientes IDs de talla no existen: ${invalidIds.join(", ")}`
+          error: "IDs de talla inválidos",
+          detalles: `Los siguientes IDs no son válidos: ${invalidTallas.join(", ")}`
         });
       }
     }
@@ -129,37 +132,40 @@ const createProducto = async (req, res) => {
 // Actualizar un producto existente
 const updateProducto = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // Extraer el id de los parámetros
 
-    // Verificar si el producto existe
-    const productoExistente = await Producto.findById(id);
-    if (!productoExistente) {
-      return res.status(404).json({
-        mensaje: "Producto no encontrado"
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        error: "ID de producto inválido"
       });
     }
 
-    // Parse tallasDisponibles if provided
-    let tallasDisponibles = req.body.tallasDisponibles;
-    if (tallasDisponibles !== undefined) {
-      if (typeof tallasDisponibles === "string") {
-        tallasDisponibles = [tallasDisponibles];
-      } else if (!Array.isArray(tallasDisponibles)) {
-        tallasDisponibles = tallasDisponibles ? [tallasDisponibles] : [];
-      }
+    // Obtener el producto existente para manipulación de imagen
+    const productoExistente = await Producto.findById(id);
+    if (!productoExistente) {
+      return res.status(404).json({
+        error: "Producto no encontrado"
+      });
+    }
 
-      // Validate that each talla ID exists in the database
-      if (tallasDisponibles.length > 0) {
-        const validTallas = await Talla.find({ _id: { $in: tallasDisponibles } });
-        if (validTallas.length !== tallasDisponibles.length) {
-          const invalidIds = tallasDisponibles.filter(
-            id => !validTallas.some(talla => talla._id.toString() === id)
-          );
-          return res.status(400).json({
-            error: "Tallas inválidas",
-            detalles: `Los siguientes IDs de talla no existen: ${invalidIds.join(", ")}`
-          });
-        }
+    if (req.body.localidadId && !mongoose.Types.ObjectId.isValid(req.body.localidadId)) {
+      return res.status(400).json({
+        error: "ID de localidad inválido"
+      });
+    }
+
+    // Validar tallasDisponibles si se incluyen en la actualización
+    if (req.body.tallasDisponibles) {
+      let tallasDisponibles = Array.isArray(req.body.tallasDisponibles) 
+        ? req.body.tallasDisponibles 
+        : [req.body.tallasDisponibles];
+
+      const invalidTallas = tallasDisponibles.filter(id => !mongoose.Types.ObjectId.isValid(id));
+      if (invalidTallas.length > 0) {
+        return res.status(400).json({
+          error: "IDs de talla inválidos",
+          detalles: `Los siguientes IDs no son válidos: ${invalidTallas.join(", ")}`
+        });
       }
     }
 
@@ -169,7 +175,7 @@ const updateProducto = async (req, res) => {
     if (req.body.descripcion !== undefined) updateData.descripcion = req.body.descripcion;
     if (req.body.localidadId !== undefined) updateData.localidadId = req.body.localidadId;
     if (req.body.tipoTela !== undefined) updateData.tipoTela = req.body.tipoTela;
-    if (tallasDisponibles !== undefined) updateData.tallasDisponibles = tallasDisponibles;
+    if (req.body.tallasDisponibles !== undefined) updateData.tallasDisponibles = req.body.tallasDisponibles;
     if (req.body.imagenURL !== undefined) updateData.imagenURL = req.body.imagenURL;
 
     // Handle image upload if there's a new file
@@ -199,7 +205,7 @@ const updateProducto = async (req, res) => {
           updateData.imagenURL = result.secure_url;
 
           try {
-            // Update the product
+            // Update the product - usar id extraído de req.params
             const productoActualizado = await Producto.findByIdAndUpdate(
               id,
               updateData,
@@ -233,7 +239,7 @@ const updateProducto = async (req, res) => {
       // No new image, update product directly
       try {
         const productoActualizado = await Producto.findByIdAndUpdate(
-          id,
+          id, // Usar id extraído de req.params
           updateData,
           { new: true, runValidators: true }
         ).populate({
