@@ -15,6 +15,8 @@ const adminContenidoRoutes = require("./routes/adminContenido");
 const productoRoutes = require("./routes/productoRoutes");
 const tallasRoutes = require("./routes/tallasRoutes");
 const categoriasRoutes = require("./routes/categoriasRoutes");
+const localidadesRoutes = require("./routes/localidadesRoutes");
+
 
 // Inicializar la aplicación Express
 const app = express();
@@ -42,6 +44,9 @@ app.use("/api/productos", productoRoutes);
 app.use("/api/tallas", tallasRoutes);
 // Rutas de categorías
 app.use("/api/categorias", categoriasRoutes);
+// Ruta para las localidades
+app.use("/api/localidades", localidadesRoutes);
+// Rutas para la administración de galería
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {
