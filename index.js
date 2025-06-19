@@ -16,7 +16,8 @@ const productoRoutes = require("./routes/productoRoutes");
 const tallasRoutes = require("./routes/tallasRoutes");
 const categoriasRoutes = require("./routes/categoriasRoutes");
 const localidadesRoutes = require("./routes/localidadesRoutes");
-
+const fotosRoutes = require("./routes/fotosRoutes");
+const videosRoutes = require("./routes/videosRoutes");
 
 // Inicializar la aplicación Express
 const app = express();
@@ -47,6 +48,9 @@ app.use("/api/categorias", categoriasRoutes);
 // Ruta para las localidades
 app.use("/api/localidades", localidadesRoutes);
 // Rutas para la administración de galería
+// Rutas para la galería
+app.use("/api/fotos", fotosRoutes);
+app.use("/api/videos", videosRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {

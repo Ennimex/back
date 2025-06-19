@@ -4,7 +4,8 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true
+  secure: true,
+  timeout: 120000 // Timeout global de 2 minutos
 });
 
 module.exports = cloudinary;

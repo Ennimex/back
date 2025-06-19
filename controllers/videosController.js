@@ -30,15 +30,35 @@ const upload = multer({
   }
 });
 
-// Función para subir videos a Cloudinary
+// Función para subir videos a Cloudinary con tiempos de espera más largos y reintentos
 async function uploadVideoToCloudinary(filePath, options = {}) {
   const uploadOptions = {
     resource_type: 'video',
-    chunk_size: 6000000, // Para videos grandes
+    chunk_size: 6000000, // 6MB por trozo
+    timeout: 120000, // 2 minutos de timeout por trozo
     folder: 'galeria/videos',
     ...options
   };
-  return await cloudinary.uploader.upload(filePath, uploadOptions);
+  
+  // Implementar reintentos
+  let attempts = 0;
+  const maxAttempts = 3;
+  
+  while (attempts < maxAttempts) {
+    try {
+      return await cloudinary.uploader.upload(filePath, uploadOptions);
+    } catch (error) {
+      attempts++;
+      console.log(`Intento ${attempts} fallido: ${error.message}`);
+      
+      if (attempts >= maxAttempts || error.http_code !== 499) {
+        throw error; // Relanzar el error si no es timeout o se agotaron los reintentos
+      }
+      
+      // Esperar antes de reintentar (backoff exponencial)
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+    }
+  }
 }
 
 // Obtener todos los videos
@@ -78,8 +98,16 @@ const createVideo = async (req, res) => {
       return res.status(400).json({ error: 'No se proporcionó ningún video' });
     }
 
-    // Subir a Cloudinary
-    const result = await uploadVideoToCloudinary(req.file.path);
+    console.log(`Iniciando subida de video: ${req.file.originalname} (${req.file.size} bytes)`);
+    
+    // Subir a Cloudinary con tiempos de espera extendidos
+    const result = await uploadVideoToCloudinary(req.file.path, {
+      resource_type: 'video',
+      timeout: 600000, // 10 minutos de timeout total
+      chunk_size: 6000000 // 6MB por trozo
+    });
+
+    console.log(`Video subido exitosamente a Cloudinary: ${result.public_id}`);
 
     // Eliminar archivo temporal
     fs.unlinkSync(req.file.path);
@@ -87,7 +115,10 @@ const createVideo = async (req, res) => {
     const nuevoVideo = new Video({
       url: result.secure_url,
       titulo: req.body.titulo || 'Sin título',
-      descripcion: req.body.descripcion || ''
+      descripcion: req.body.descripcion || '',
+      publicId: result.public_id,
+      duracion: result.duration || 0,
+      formato: result.format || ''
     });
 
     const videoGuardado = await nuevoVideo.save();
@@ -131,24 +162,46 @@ const updateVideo = async (req, res) => {
     
     // Si hay un nuevo video, subirlo a Cloudinary
     if (req.file) {
-      // Subir nuevo video
-      const result = await uploadVideoToCloudinary(req.file.path);
+      console.log(`Actualizando video: ${req.file.originalname} (${req.file.size} bytes)`);
+      
+      // Subir nuevo video con timeout extendido
+      const result = await uploadVideoToCloudinary(req.file.path, {
+        timeout: 600000, // 10 minutos de timeout total
+        chunk_size: 6000000 // 6MB por trozo
+      });
       
       // Eliminar archivo temporal
       fs.unlinkSync(req.file.path);
       
-      // Extraer el public_id de la URL existente
-      const urlParts = videoExistente.url.split('/');
-      const publicId = 'galeria/videos/' + urlParts[urlParts.length - 1].split('.')[0];
-      
       // Eliminar video anterior de Cloudinary
-      try {
-        await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
-      } catch (cloudinaryError) {
-        console.warn('Error al eliminar video antiguo:', cloudinaryError);
+      if (videoExistente.publicId) {
+        try {
+          await cloudinary.uploader.destroy(videoExistente.publicId, { 
+            resource_type: 'video',
+            timeout: 60000 // 1 minuto para la eliminación
+          });
+        } catch (cloudinaryError) {
+          console.warn('Error al eliminar video antiguo:', cloudinaryError);
+        }
+      } else {
+        // Si no hay publicId guardado, intentar extraerlo de la URL
+        const urlParts = videoExistente.url.split('/');
+        const publicId = 'galeria/videos/' + urlParts[urlParts.length - 1].split('.')[0];
+        
+        try {
+          await cloudinary.uploader.destroy(publicId, { 
+            resource_type: 'video',
+            timeout: 60000
+          });
+        } catch (cloudinaryError) {
+          console.warn('Error al eliminar video antiguo (usando URL):', cloudinaryError);
+        }
       }
       
       updateData.url = result.secure_url;
+      updateData.publicId = result.public_id;
+      updateData.duracion = result.duration || 0;
+      updateData.formato = result.format || '';
     }
     
     // Actualizar el video en la base de datos
@@ -186,13 +239,18 @@ const deleteVideo = async (req, res) => {
       return res.status(404).json({ error: 'Video no encontrado' });
     }
     
-    // Extraer el public_id de la URL
-    const urlParts = video.url.split('/');
-    const publicId = 'galeria/videos/' + urlParts[urlParts.length - 1].split('.')[0];
+    // Usar el publicId guardado o extraerlo de la URL
+    const publicId = video.publicId || (() => {
+      const urlParts = video.url.split('/');
+      return 'galeria/videos/' + urlParts[urlParts.length - 1].split('.')[0];
+    })();
     
-    // Eliminar de Cloudinary
+    // Eliminar de Cloudinary con timeout extendido
     try {
-      await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
+      await cloudinary.uploader.destroy(publicId, { 
+        resource_type: 'video',
+        timeout: 60000 // 1 minuto para la eliminación
+      });
     } catch (cloudinaryError) {
       console.warn('Error al eliminar video de Cloudinary:', cloudinaryError);
     }
