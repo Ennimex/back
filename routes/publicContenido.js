@@ -11,6 +11,7 @@ const Categorias = require("../models/Categorias");
 const Producto = require('../models/Producto');
 const Foto = require('../models/Fotos');
 const Video = require('../models/Video');
+const Colaboradores = require('../models/Colaboradores');
 
 
 // Middleware para todas las rutas (no requiere autenticación)
@@ -242,5 +243,20 @@ router.get('/galeria/pagina/:pagina', async (req, res) => {
     });
   }
 });
+
+// Obtener todos los colaboradores
+router.get('/colaboradores', async (req, res) => {
+  try {
+    const colaboradores = await Colaboradores.find();
+    res.json(colaboradores);
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Error al obtener colaboradores',
+      detalles: error.message 
+    });
+  }
+});
+
+
 
 module.exports = router;

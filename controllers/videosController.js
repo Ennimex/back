@@ -30,6 +30,34 @@ const upload = multer({
   }
 });
 
+// Función para generar miniatura de video usando Cloudinary
+async function generarMiniatura(publicId) {
+  try {
+    // Generar URL de transformación para la miniatura
+    const miniatura = cloudinary.url(publicId, {
+      resource_type: 'video',
+      format: 'jpg',
+      transformation: [
+        { width: 480, crop: 'scale' },
+        { start_offset: '0' } // Tomar miniatura del primer frame
+      ]
+    });
+
+    // Extraer el public_id de la miniatura
+    const urlParts = miniatura.split('/');
+    const filename = urlParts[urlParts.length - 1];
+    const miniaturaPublicId = filename.split('.')[0];
+
+    return {
+      url: miniatura,
+      publicId: miniaturaPublicId
+    };
+  } catch (error) {
+    console.error('Error al generar miniatura:', error);
+    return null;
+  }
+}
+
 // Función para subir videos a Cloudinary con tiempos de espera más largos y reintentos
 async function uploadVideoToCloudinary(filePath, options = {}) {
   const uploadOptions = {
@@ -109,25 +137,34 @@ const createVideo = async (req, res) => {
 
     console.log(`Video subido exitosamente a Cloudinary: ${result.public_id}`);
 
+    // Generar miniatura del video
+    const miniatura = await generarMiniatura(result.public_id);
+    if (miniatura) {
+      console.log(`Miniatura generada exitosamente: ${miniatura.url}`);
+    } else {
+      console.warn('No se pudo generar la miniatura del video');
+    }
+
     // Eliminar archivo temporal
     fs.unlinkSync(req.file.path);
-    
-    const nuevoVideo = new Video({
+      const nuevoVideo = new Video({
       url: result.secure_url,
       titulo: req.body.titulo || 'Sin título',
       descripcion: req.body.descripcion || '',
       publicId: result.public_id,
       duracion: result.duration || 0,
-      formato: result.format || ''
+      formato: result.format || '',
+      miniatura: miniatura ? miniatura.url : null,
+      miniaturaPublicId: miniatura ? miniatura.publicId : null
     });
 
-    const videoGuardado = await nuevoVideo.save();
-    res.status(201).json({
+    const videoGuardado = await nuevoVideo.save();    res.status(201).json({
       mensaje: 'Video subido correctamente',
       video: videoGuardado,
       detalles: {
         duracion: result.duration,
-        formato: result.format
+        formato: result.format,
+        tieneMiniatura: !!miniatura
       }
     });
   } catch (error) {
@@ -197,6 +234,15 @@ const updateVideo = async (req, res) => {
           console.warn('Error al eliminar video antiguo (usando URL):', cloudinaryError);
         }
       }
+        // Generar nueva miniatura
+      const miniatura = await generarMiniatura(result.public_id);
+      if (miniatura) {
+        console.log(`Nueva miniatura generada exitosamente: ${miniatura.url}`);
+        updateData.miniatura = miniatura.url;
+        updateData.miniaturaPublicId = miniatura.publicId;
+      } else {
+        console.warn('No se pudo generar la nueva miniatura del video');
+      }
       
       updateData.url = result.secure_url;
       updateData.publicId = result.public_id;
@@ -244,15 +290,22 @@ const deleteVideo = async (req, res) => {
       const urlParts = video.url.split('/');
       return 'galeria/videos/' + urlParts[urlParts.length - 1].split('.')[0];
     })();
-    
-    // Eliminar de Cloudinary con timeout extendido
+      // Eliminar de Cloudinary con timeout extendido
     try {
       await cloudinary.uploader.destroy(publicId, { 
         resource_type: 'video',
         timeout: 60000 // 1 minuto para la eliminación
       });
+      
+      // Intentar eliminar la miniatura si existe
+      if (video.miniaturaPublicId) {
+        await cloudinary.uploader.destroy(video.miniaturaPublicId, {
+          timeout: 30000 // 30 segundos para eliminar la miniatura
+        });
+        console.log(`Miniatura eliminada: ${video.miniaturaPublicId}`);
+      }
     } catch (cloudinaryError) {
-      console.warn('Error al eliminar video de Cloudinary:', cloudinaryError);
+      console.warn('Error al eliminar archivos de Cloudinary:', cloudinaryError);
     }
     
     // Eliminar de la base de datos

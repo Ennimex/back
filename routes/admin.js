@@ -35,29 +35,55 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// Cambiar rol de usuario
-router.put('/users/:userId/role', async (req, res) => {
+// Editar información de usuario
+router.put('/users/:userId', async (req, res) => {
   try {
-    const { role } = req.body;
     const { userId } = req.params;
-
-    if (!['user', 'admin'].includes(role)) {
-      return res.status(400).json({ error: 'Rol inválido' });
+    const { name, email, phone, role } = req.body;
+    
+    // Preparar los campos a actualizar
+    const updateData = {};
+    
+    if (name) updateData.name = name;
+    if (phone) updateData.phone = phone;
+    if (role) {
+      if (!['user', 'admin'].includes(role)) {
+        return res.status(400).json({ error: 'Rol inválido' });
+      }
+      updateData.role = role;
     }
-
+    
+    // Si se intenta cambiar el correo, verificar que no exista
+    if (email) {
+      const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingUser) {
+        return res.status(400).json({ error: 'El correo electrónico ya está en uso por otro usuario' });
+      }
+      updateData.email = email;
+    }
+    
+    // Actualizar usuario
     const user = await User.findByIdAndUpdate(
       userId,
-      { role },
-      { new: true }
+      updateData,
+      { new: true, runValidators: true }
     );
 
     if (!user) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    res.json(user);
+    res.json({
+      success: true,
+      data: user,
+      message: 'Usuario actualizado exitosamente'
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Error al actualizar rol' });
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({ error: messages });
+    }
+    res.status(500).json({ error: 'Error al actualizar el usuario' });
   }
 });
 
@@ -74,6 +100,48 @@ router.delete('/users/:userId', async (req, res) => {
     res.json({ message: 'Usuario eliminado exitosamente' });
   } catch (error) {
     res.status(500).json({ error: 'Error al eliminar usuario' });
+  }
+});
+
+// Agregar un nuevo usuario
+router.post('/users', async (req, res) => {
+  try {
+    const { name, email, phone, password, role = 'user' } = req.body;
+
+    // Validar que el correo no exista
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'El correo electrónico ya está registrado' });
+    }
+
+    // Validar rol
+    if (role && !['user', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Rol inválido' });
+    }
+
+    // Crear nuevo usuario
+    const user = await User.create({
+      name,
+      email,
+      phone,
+      password,
+      role
+    });
+
+    // Eliminar la contraseña del objeto de respuesta
+    user.password = undefined;
+
+    res.status(201).json({
+      success: true,
+      data: user,
+      message: 'Usuario creado exitosamente'
+    });
+  } catch (error) {
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({ error: messages });
+    }
+    res.status(500).json({ error: 'Error al crear el usuario' });
   }
 });
 

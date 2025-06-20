@@ -5,4 +5,4 @@ const ColaboradorSchema = new mongoose.Schema({
   rol: String
 });
 
-module.exports = mongoose.model('Colaborador', ColaboradorSchema);
+module.exports = mongoose.model('Colaboradores', ColaboradorSchema);
