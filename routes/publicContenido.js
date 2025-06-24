@@ -115,6 +115,29 @@ router.get('/productos', async (req, res) => {
   }
 });
 
+// Ruta pública para obtener el detalle de un producto por su ID
+router.get('/productos/:id', async (req, res) => {
+  try {
+    const producto = await Producto.findById(req.params.id)
+      .populate('localidadId')
+      .populate({
+        path: 'tallasDisponibles',
+        populate: {
+          path: 'categoriaId'
+        }
+      });
+    if (!producto) {
+      return res.status(404).json({ error: 'Producto no encontrado' });
+    }
+    res.json(producto);
+  } catch (error) {
+    res.status(500).json({ 
+      error: 'Error al obtener el producto',
+      detalles: error.message 
+    });
+  }
+});
+
 // RUTAS PARA GALERÍA
 
 // Obtener todas las fotos

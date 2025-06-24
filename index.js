@@ -18,6 +18,7 @@ const categoriasRoutes = require("./routes/categoriasRoutes");
 const localidadesRoutes = require("./routes/localidadesRoutes");
 const fotosRoutes = require("./routes/fotosRoutes");
 const videosRoutes = require("./routes/videosRoutes");
+const eventosRoutes = require('./routes/eventosRoutes');
 
 // Inicializar la aplicación Express
 const app = express();
@@ -47,10 +48,11 @@ app.use("/api/tallas", tallasRoutes);
 app.use("/api/categorias", categoriasRoutes);
 // Ruta para las localidades
 app.use("/api/localidades", localidadesRoutes);
-// Rutas para la administración de galería
 // Rutas para la galería
 app.use("/api/fotos", fotosRoutes);
 app.use("/api/videos", videosRoutes);
+// Rutas para eventos
+app.use("/api/eventos", eventosRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {
