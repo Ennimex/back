@@ -1,0 +1,76 @@
+# Dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variables de entorno
+.env
+.env.local
+.env.production
+.env.staging
+
+# Archivos de configuración sensibles
+config.json
+
+# Logs
+logs
+*.log
+
+# Archivos temporales
+.tmp/
+temp/
+temp-uploads/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos del editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de build
+dist/
+build/
+
+# Archivos de caché
+.cache/
+.eslintcache
+
+# Archivos de base de datos locales
+*.db
+*.sqlite
+*.sqlite3
+mongodb-data/
+db-backup/
+
+# Archivos subidos (mantener estructura pero no contenido)
+uploads/*
+!uploads/.gitkeep
+# Específicamente los archivos de video que ya tienes
+uploads/*.mp4
+uploads/*.avi
+uploads/*.mov
+uploads/*.wmv
+
+# Archivos de certificados SSL
+*.pem
+*.key
+*.crt
+
+# Archivos de respaldo
+*.bak
+*.backup
+
+# Archivos específicos del proyecto
+package-lock.json
+
+# Archivos específicos de Cloudinary (por si generas tokens temporales)
+cloudinary-temp/
+
+# Archivos de JWT tokens temporales
+tokens/
+jwt-temp/
