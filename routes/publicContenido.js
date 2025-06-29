@@ -13,41 +13,21 @@ const Foto = require('../models/Fotos');
 const Video = require('../models/Video');
 const Colaboradores = require('../models/Colaboradores');
 
+// Importar controladores
+const { getNosotros } = require('../controllers/nosotrosController');
+const { getServicios, getServicioById } = require('../controllers/serviciosController');
+
 
 // Middleware para todas las rutas (no requiere autenticación)
 
 // Obtener información de Nosotros
-router.get('/nosotros', async (req, res) => {
-  try {
-    const nosotros = await Nosotros.findOne();
-    res.json(nosotros || {});
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener información' });
-  }
-});
+router.get('/nosotros', getNosotros);
 
 // Obtener todos los servicios
-router.get('/servicios', async (req, res) => {
-  try {
-    const servicios = await Servicio.find();
-    res.json(servicios);
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener servicios' });
-  }
-});
+router.get('/servicios', getServicios);
 
 // Obtener un servicio específico
-router.get('/servicios/:id', async (req, res) => {
-  try {
-    const servicio = await Servicio.findById(req.params.id);
-    if (!servicio) {
-      return res.status(404).json({ error: 'Servicio no encontrado' });
-    }
-    res.json(servicio);
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener el servicio' });
-  }
-});
+router.get('/servicios/:id', getServicioById);
 
 // Obtener todas las localidades
 router.get('/localidades', async (req, res) => {

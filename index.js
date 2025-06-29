@@ -16,6 +16,8 @@ const productoRoutes = require("./routes/productoRoutes");
 const tallasRoutes = require("./routes/tallasRoutes");
 const categoriasRoutes = require("./routes/categoriasRoutes");
 const localidadesRoutes = require("./routes/localidadesRoutes");
+const nosotrosRoutes = require("./routes/nosotrosRoutes");
+const serviciosRoutes = require("./routes/serviciosRoutes");
 const fotosRoutes = require("./routes/fotosRoutes");
 const videosRoutes = require("./routes/videosRoutes");
 const eventosRoutes = require('./routes/eventosRoutes');
@@ -48,6 +50,10 @@ app.use("/api/tallas", tallasRoutes);
 app.use("/api/categorias", categoriasRoutes);
 // Ruta para las localidades
 app.use("/api/localidades", localidadesRoutes);
+// Ruta para nosotros (misión y visión)
+app.use("/api/nosotros", nosotrosRoutes);
+// Ruta para servicios
+app.use("/api/servicios", serviciosRoutes);
 // Rutas para la galería
 app.use("/api/fotos", fotosRoutes);
 app.use("/api/videos", videosRoutes);

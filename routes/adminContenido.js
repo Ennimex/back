@@ -8,70 +8,24 @@ const Servicio = require("../models/Servicio");
 const Contacto = require("../models/Contacto");
 const Categoria = require("../models/Categorias");
 
+// Importar controladores
+const { createOrUpdateNosotros } = require('../controllers/nosotrosController');
+const { createServicio, updateServicio, deleteServicio, upload } = require('../controllers/serviciosController');
+
 // Middleware para todas las rutas
 router.use(authenticate, checkRole(["admin"]));
 
 // RUTAS PARA NOSOTROS
-router.put("/nosotros", async (req, res) => {
-  try {
-    const { mision, vision, valores } = req.body;
-    let nosotros = await Nosotros.findOne();
-
-    if (!nosotros) {
-      nosotros = new Nosotros({ mision, vision, valores });
-    } else {
-      nosotros.mision = mision;
-      nosotros.vision = vision;
-      nosotros.valores = valores;
-    }
-
-    await nosotros.save();
-    res.json(nosotros);
-  } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Error al actualizar información de Nosotros" });
-  }
-});
+router.put("/nosotros", createOrUpdateNosotros);
 
 // Rutas para obtener la infromacion de servicios
-router.post("/servicios", async (req, res) => {
-  try {
-    const servicio = new Servicio(req.body);
-    await servicio.save();
-    res.status(201).json(servicio);
-  } catch (error) {
-    res.status(500).json({ error: "Error al crear servicio" });
-  }
-});
+router.post("/servicios", upload.single('imagen'), createServicio);
 
 // Rutas para actualizar un servicio
-router.put("/servicios/:id", async (req, res) => {
-  try {
-    const servicio = await Servicio.findByIdAndUpdate(req.params.id, req.body, {
-      new: true
-    });
-    if (!servicio) {
-      return res.status(404).json({ error: "Servicio no encontrado" });
-    }
-    res.json(servicio);
-  } catch (error) {
-    res.status(500).json({ error: "Error al actualizar servicio" });
-  }
-});
+router.put("/servicios/:id", upload.single('imagen'), updateServicio);
 
 // Rutas para eliminar un servicio
-router.delete("/servicios/:id", async (req, res) => {
-  try {
-    const servicio = await Servicio.findByIdAndDelete(req.params.id);
-    if (!servicio) {
-      return res.status(404).json({ error: "Servicio no encontrado" });
-    }
-    res.json({ message: "Servicio eliminado correctamente" });
-  } catch (error) {
-    res.status(500).json({ error: "Error al eliminar servicio" });
-  }
-});
+router.delete("/servicios/:id", deleteServicio);
 
 // RUTAS PARA PROYECTOS
 router.post("/proyectos", async (req, res) => {
