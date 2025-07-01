@@ -33,9 +33,12 @@ router.post('/login', async (req, res) => {
     const expiresIn = process.env.JWT_EXPIRE || '1h';
     
     console.log('✅ Login exitoso para:', user.email);
+    console.log('🕐 JWT_EXPIRE from env:', process.env.JWT_EXPIRE);
+    console.log('🕐 expiresIn value:', expiresIn);
     
     // Calcular la expiración del token correctamente
     const expirationTime = ms(expiresIn);
+    console.log('🕐 expirationTime (ms):', expirationTime);
     const tokenExpiration = new Date(Date.now() + expirationTime).getTime();
     
     res.json({ 
