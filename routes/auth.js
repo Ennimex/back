@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const ms = require('ms');
 
 router.post('/login', async (req, res) => {
   try {
@@ -33,11 +34,15 @@ router.post('/login', async (req, res) => {
     
     console.log('✅ Login exitoso para:', user.email);
     
+    // Calcular la expiración del token correctamente
+    const expirationTime = ms(expiresIn);
+    const tokenExpiration = new Date(Date.now() + expirationTime).getTime();
+    
     res.json({ 
       token, 
       user: { role: user.role, email: user.email, name: user.name },
       expiresIn,
-      tokenExpiration: new Date(Date.now() + parseInt(expiresIn) * 60 * 1000).getTime()
+      tokenExpiration
     });
   } catch (error) {
     console.error('❌ Error en login:', error);
