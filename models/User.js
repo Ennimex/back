@@ -64,15 +64,21 @@ UserSchema.pre('save', async function (next) {
 UserSchema.methods.getSignedJwtToken = function () {
   // Asegurar que JWT_EXPIRE tenga un formato válido
   let jwtExpire = process.env.JWT_EXPIRE || '1h';
+  
+  // Limpiar espacios en blanco y caracteres especiales
+  jwtExpire = jwtExpire.toString().trim();
+  
   console.log('JWT_EXPIRE value:', jwtExpire, 'type:', typeof jwtExpire);
   
   // Validar que el formato sea correcto para JWT
   const validFormats = /^(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|sec|seconds?|m|min|minutes?|h|hr|hours?|d|days?|w|wk|weeks?|y|yrs?|years?)$/i;
   
-  if (!validFormats.test(jwtExpire.toString().trim())) {
+  if (!validFormats.test(jwtExpire)) {
     console.warn('⚠️  JWT_EXPIRE format invalid, using default 1h');
     jwtExpire = '1h';
   }
+  
+  console.log('Final JWT expire value:', jwtExpire);
   
   return jwt.sign({ id: this._id, role: this.role }, process.env.JWT_SECRET, {
     expiresIn: jwtExpire,

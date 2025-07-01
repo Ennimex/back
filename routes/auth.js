@@ -29,7 +29,18 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciales inválidas - Contraseña incorrecta' });
     }
 
-    const token = user.getSignedJwtToken();
+    // Generar token con manejo de errores
+    let token;
+    try {
+      token = user.getSignedJwtToken();
+    } catch (tokenError) {
+      console.error('❌ Error generando JWT token:', tokenError);
+      return res.status(500).json({ 
+        error: 'Error interno del servidor al generar token',
+        details: tokenError.message 
+      });
+    }
+
     const expiresIn = process.env.JWT_EXPIRE || '1h';
     
     console.log('✅ Login exitoso para:', user.email);
