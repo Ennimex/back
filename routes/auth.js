@@ -5,15 +5,33 @@ const User = require('../models/User');
 
 router.post('/login', async (req, res) => {
   try {
+    console.log('🔐 Intento de login:', { email: req.body.email });
+    
     const { email, password } = req.body;
-    const user = await User.findOne({ email }).select('+password');
+    
+    // Validar que los campos estén presentes
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email y contraseña son requeridos' });
+    }
 
-    if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
+    const user = await User.findOne({ email }).select('+password');
+    console.log('👤 Usuario encontrado:', user ? 'Sí' : 'No');
+
+    if (!user) {
+      return res.status(401).json({ error: 'Credenciales inválidas - Usuario no encontrado' });
+    }
+
+    const isPasswordValid = await user.matchPassword(password);
+    console.log('🔑 Contraseña válida:', isPasswordValid ? 'Sí' : 'No');
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Credenciales inválidas - Contraseña incorrecta' });
     }
 
     const token = user.getSignedJwtToken();
-    const expiresIn = process.env.JWT_EXPIRE;
+    const expiresIn = process.env.JWT_EXPIRE || '1h';
+    
+    console.log('✅ Login exitoso para:', user.email);
     
     res.json({ 
       token, 
@@ -22,7 +40,11 @@ router.post('/login', async (req, res) => {
       tokenExpiration: new Date(Date.now() + parseInt(expiresIn) * 60 * 1000).getTime()
     });
   } catch (error) {
-    res.status(500).json({ error: 'Error en el servidor' });
+    console.error('❌ Error en login:', error);
+    res.status(500).json({ 
+      error: 'Error en el servidor',
+      details: error.message 
+    });
   }
 });
 
