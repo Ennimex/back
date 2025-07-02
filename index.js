@@ -21,6 +21,7 @@ const serviciosRoutes = require("./routes/serviciosRoutes");
 const fotosRoutes = require("./routes/fotosRoutes");
 const videosRoutes = require("./routes/videosRoutes");
 const eventosRoutes = require('./routes/eventosRoutes');
+const perfilRoutes = require('./routes/perfilRoutes');
 
 // Inicializar la aplicación Express
 const app = express();
@@ -59,6 +60,8 @@ app.use("/api/fotos", fotosRoutes);
 app.use("/api/videos", videosRoutes);
 // Rutas para eventos
 app.use("/api/eventos", eventosRoutes);
+// Rutas para perfil de usuario
+app.use("/api/perfil", perfilRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {
