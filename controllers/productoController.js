@@ -106,9 +106,11 @@ const createProducto = async (req, res) => {
             // Create and save the product
             const nuevoProducto = new Producto(productData);
             const productoGuardado = await nuevoProducto.save();
+            console.log(`✅ Producto "${productoGuardado.nombre}" creado exitosamente con imagen en Cloudinary`);
             res.status(201).json({
-              mensaje: "Producto creado correctamente",
-              producto: productoGuardado
+              mensaje: "Producto creado correctamente con imagen subida",
+              producto: productoGuardado,
+              imagenSubida: true
             });
           } catch (saveError) {
             console.error("Error al guardar producto:", saveError);
@@ -125,9 +127,11 @@ const createProducto = async (req, res) => {
       // No file uploaded, save product directly
       const nuevoProducto = new Producto(productData);
       const productoGuardado = await nuevoProducto.save();
+      console.log(`✅ Producto "${productoGuardado.nombre}" creado exitosamente sin imagen`);
       res.status(201).json({
-        mensaje: "Producto creado correctamente",
-        producto: productoGuardado
+        mensaje: "Producto creado correctamente sin imagen",
+        producto: productoGuardado,
+        imagenSubida: false
       });
     }
   } catch (error) {
@@ -240,9 +244,11 @@ const updateProducto = async (req, res) => {
               }
             });
 
+            console.log(`✅ Producto "${productoActualizado.nombre}" actualizado exitosamente con nueva imagen`);
             res.json({
-              mensaje: "Producto actualizado correctamente",
-              producto: productoActualizado
+              mensaje: "Producto actualizado correctamente con nueva imagen",
+              producto: productoActualizado,
+              imagenActualizada: true
             });
           } catch (updateError) {
             console.error("Error al actualizar producto:", updateError);
@@ -272,9 +278,11 @@ const updateProducto = async (req, res) => {
           }
         });
 
+        console.log(`✅ Producto "${productoActualizado.nombre}" actualizado exitosamente sin cambio de imagen`);
         res.json({
           mensaje: "Producto actualizado correctamente",
-          producto: productoActualizado
+          producto: productoActualizado,
+          imagenActualizada: false
         });
       } catch (updateError) {
         console.error("Error al actualizar producto:", updateError);
@@ -317,9 +325,14 @@ const deleteProducto = async (req, res) => {
 
     await Producto.findByIdAndDelete(id);
 
+    console.log(`✅ Producto "${producto.nombre}" eliminado exitosamente`);
     res.json({
       mensaje: "Producto eliminado correctamente",
-      productoEliminado: producto
+      productoEliminado: {
+        id: producto._id,
+        nombre: producto.nombre,
+        imagenEliminada: !!producto.imagenURL
+      }
     });
   } catch (error) {
     console.error("Error al eliminar producto:", error);
