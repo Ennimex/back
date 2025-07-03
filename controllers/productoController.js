@@ -83,9 +83,19 @@ const createProducto = async (req, res) => {
         async (error, result) => {
           if (error) {
             console.error("Error al subir a Cloudinary:", error);
+            
+            // Mensaje de error más específico según el tipo de error
+            let errorMessage = "Error al subir la imagen";
+            if (error.http_code === 401) {
+              errorMessage = "Error de autenticación con Cloudinary. Verifique las credenciales.";
+            } else if (error.http_code === 400) {
+              errorMessage = "Error en la configuración de Cloudinary o formato de imagen inválido.";
+            }
+            
             return res.status(500).json({
-              error: "Error al subir la imagen",
-              detalles: error.message
+              error: errorMessage,
+              detalles: error.message,
+              codigo: error.http_code || 'No disponible'
             });
           }
 
@@ -185,9 +195,19 @@ const updateProducto = async (req, res) => {
         async (error, result) => {
           if (error) {
             console.error("Error al subir a Cloudinary:", error);
+            
+            // Mensaje de error más específico según el tipo de error
+            let errorMessage = "Error al subir la imagen";
+            if (error.http_code === 401) {
+              errorMessage = "Error de autenticación con Cloudinary. Verifique las credenciales.";
+            } else if (error.http_code === 400) {
+              errorMessage = "Error en la configuración de Cloudinary o formato de imagen inválido.";
+            }
+            
             return res.status(500).json({
-              error: "Error al subir la imagen",
-              detalles: error.message
+              error: errorMessage,
+              detalles: error.message,
+              codigo: error.http_code || 'No disponible'
             });
           }
 
