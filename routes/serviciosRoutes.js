@@ -9,6 +9,11 @@ const {
     upload
 } = require('../controllers/serviciosController');
 const { authenticate, isAdmin } = require("../middlewares/auth");
+// Importa el middleware de logging
+const requestLogger = require('../middlewares/requestLogger');
+
+// Aplicar logging a todas las rutas de servicios
+router.use(requestLogger);
 
 // Rutas públicas
 router.get('/', getServicios);
