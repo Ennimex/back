@@ -9,6 +9,11 @@ const {
     upload
 } = require('../controllers/fotosController');
 const { authenticate, isAdmin } = require("../middlewares/auth");
+// Importa el middleware de logging
+const requestLogger = require('../middlewares/requestLogger');
+
+// Aplicar logging a todas las rutas de fotos
+router.use(requestLogger);
 
 // Rutas públicas
 router.get('/', getFotos);
