@@ -1,0 +1,31 @@
+# Blueprint de Render para el backend (Express + MongoDB)
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: ennimex-back
+    runtime: node
+    plan: free # Cambia a "starter" ($7/mes) para evitar que se duerma por inactividad
+    branch: main
+    # Render detecta pnpm automáticamente por el campo "packageManager" del package.json
+    buildCommand: pnpm install --frozen-lockfile
+    startCommand: pnpm start
+    healthCheckPath: / # Responde "Bienvenidos a mi API"
+    autoDeploy: true # Redepliega al hacer push a la rama "main"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRE
+        value: 1h
+      # --- Secretos: se configuran en el panel de Render (sync: false los deja vacíos) ---
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
