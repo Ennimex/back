@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const UserSchema = new mongoose.Schema({
@@ -88,6 +89,21 @@ UserSchema.methods.getSignedJwtToken = function () {
 // Comparar contraseña ingresada con contraseña encriptada
 UserSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Generar token de recuperación de contraseña.
+// Devuelve el token en claro (va en el correo) y guarda solo su hash en la BD.
+UserSchema.methods.getResetPasswordToken = function () {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+
+  this.resetPasswordToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  this.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 minutos
+
+  return resetToken;
 };
 
 module.exports = mongoose.model('User', UserSchema);
