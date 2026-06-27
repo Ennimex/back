@@ -65,8 +65,10 @@ uploads/*.wmv
 *.bak
 *.backup
 
-# Archivos específicos del proyecto
+# Lockfiles: pnpm-lock.yaml SÍ debe versionarse (no se ignora).
+# Si quedan locks de otros gestores, ignóralos para evitar conflictos:
 package-lock.json
+yarn.lock
 
 # Archivos específicos de Cloudinary (por si generas tokens temporales)
 cloudinary-temp/
