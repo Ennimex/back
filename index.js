@@ -41,6 +41,10 @@ const { authenticate, isAdmin } = require("./middlewares/auth");
 // Inicializar la aplicación Express
 const app = express();
 
+// Confiar en el primer proxy (Render/Vercel van detrás de un balanceador).
+// Necesario para que express-rate-limit identifique bien la IP via X-Forwarded-For.
+app.set("trust proxy", 1);
+
 // --- Seguridad ---
 // Cabeceras HTTP seguras
 app.use(helmet());
