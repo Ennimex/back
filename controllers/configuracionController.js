@@ -38,13 +38,39 @@ const subirACloudinary = (buffer, folder = "configuracion") =>
     streamifier.createReadStream(buffer).pipe(stream);
   });
 
-// Obtener la configuración. Si no existe, crea una por defecto (singleton).
+// ¿La configuración está vacía/sin configurar? (para sembrarla una sola vez)
+const esConfigVacia = (c) =>
+  !c.descripcion &&
+  !c.direccion &&
+  !c.telefono &&
+  !c.email &&
+  !c.horarios &&
+  !(
+    c.redesSociales &&
+    (c.redesSociales.facebook ||
+      c.redesSociales.whatsapp ||
+      c.redesSociales.instagram ||
+      c.redesSociales.twitter ||
+      c.redesSociales.tiktok)
+  );
+
+// Obtener la configuración. Si no existe, crea una sembrada (singleton).
 const getConfiguracion = async (req, res) => {
   try {
     let config = await ConfiguracionSitio.findOne();
     if (!config) {
       // Primera vez: crear el documento ya sembrado con el contenido actual
       config = await ConfiguracionSitio.create(SEED_CONFIG);
+    } else if (esConfigVacia(config)) {
+      // Documento creado vacío antes de la siembra: rellenarlo una sola vez
+      config.nombre = config.nombre || SEED_CONFIG.nombre;
+      config.descripcion = SEED_CONFIG.descripcion;
+      config.direccion = SEED_CONFIG.direccion;
+      config.telefono = SEED_CONFIG.telefono;
+      config.email = SEED_CONFIG.email;
+      config.horarios = SEED_CONFIG.horarios;
+      config.redesSociales = { ...config.redesSociales, ...SEED_CONFIG.redesSociales };
+      await config.save();
     }
     res.json(config);
   } catch (error) {
