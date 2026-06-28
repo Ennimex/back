@@ -26,16 +26,10 @@ const poblarProducto = (query) =>
     .populate({ path: "tallasDisponibles", populate: { path: "categoriaId" } });
 
 // Obtener todos los productos con referencias pobladas
+// (devuelve [] cuando no hay productos; antes respondía 404 y rompía a los consumidores)
 const getProductos = asyncHandler(async (req, res) => {
   const productos = await poblarProducto(Producto.find()).lean();
-
-  if (!productos || productos.length === 0) {
-    return res.status(404).json({
-      mensaje: "No se encontraron productos en la base de datos"
-    });
-  }
-
-  res.json(productos);
+  res.json(productos || []);
 });
 
 // Crear nuevo producto con subida de imagen a Cloudinary
