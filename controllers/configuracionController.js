@@ -7,6 +7,27 @@ const streamifier = require("streamifier");
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
+// Valores iniciales (siembra): el contenido que antes estaba "hardcoded" en el
+// frontend. Se usan solo al crear el documento por primera vez, para que el
+// panel de admin aparezca pre-cargado y listo para editar.
+const SEED_CONFIG = {
+  nombre: "La Aterciopelada",
+  descripcion:
+    "Descubre la elegancia y calidad en cada prenda. Somos tu destino para la moda que refleja tu estilo único.",
+  direccion: "Región Huasteca, San Luis Potosí, México",
+  telefono: "+52 771 123 4567",
+  email: "info@laaterciopelada.com",
+  horarios: "Lunes a Viernes: 9:00 - 19:00, Sábados: 10:00 - 16:00",
+  redesSociales: {
+    facebook:
+      "https://web.facebook.com/people/La-Aterciopelada/61567232369483/?sk=photos",
+    instagram: "",
+    whatsapp: "https://wa.me/527711234567",
+    twitter: "",
+    tiktok: "",
+  },
+};
+
 // Subir un buffer a Cloudinary (promesa sobre upload_stream)
 const subirACloudinary = (buffer, folder = "configuracion") =>
   new Promise((resolve, reject) => {
@@ -22,7 +43,8 @@ const getConfiguracion = async (req, res) => {
   try {
     let config = await ConfiguracionSitio.findOne();
     if (!config) {
-      config = await ConfiguracionSitio.create({});
+      // Primera vez: crear el documento ya sembrado con el contenido actual
+      config = await ConfiguracionSitio.create(SEED_CONFIG);
     }
     res.json(config);
   } catch (error) {
