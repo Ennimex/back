@@ -1,14 +1,22 @@
 // utils/email.js
-// Envío de correos con Resend (API HTTP, funciona en Render sin SMTP)
-const { Resend } = require("resend");
+// Envío de correos con Brevo (API HTTP, funciona en Render sin SMTP).
+// Se lee la configuración de forma perezosa: si falta la API key, solo
+// falla esta función (manejada en la ruta), nunca tumba el servidor.
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// Remitente. Para producción usa un dominio verificado en Resend (RESEND_FROM).
-// Por defecto usa el dominio de pruebas de Resend (solo envía a tu propio correo).
-const FROM = process.env.RESEND_FROM || "La Aterciopelada <onboarding@resend.dev>";
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 const sendPasswordResetEmail = async (to, resetUrl) => {
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.BREVO_FROM_EMAIL;
+  const fromName = process.env.BREVO_FROM_NAME || "La Aterciopelada";
+
+  if (!apiKey) {
+    throw new Error("BREVO_API_KEY no está configurada");
+  }
+  if (!fromEmail) {
+    throw new Error("BREVO_FROM_EMAIL no está configurada");
+  }
+
   const html = `
   <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; color: #1f2937;">
     <h1 style="color: #d63384; font-size: 22px; margin-bottom: 4px;">La Aterciopelada</h1>
@@ -26,17 +34,27 @@ const sendPasswordResetEmail = async (to, resetUrl) => {
     <p style="font-size: 12px; color: #9ca3af; word-break: break-all;">Si el botón no funciona, copia y pega este enlace:<br/>${resetUrl}</p>
   </div>`;
 
-  const { data, error } = await resend.emails.send({
-    from: FROM,
-    to: [to],
-    subject: "Restablece tu contraseña - La Aterciopelada",
-    html,
+  const resp = await fetch(BREVO_API_URL, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "api-key": apiKey,
+    },
+    body: JSON.stringify({
+      sender: { name: fromName, email: fromEmail },
+      to: [{ email: to }],
+      subject: "Restablece tu contraseña - La Aterciopelada",
+      htmlContent: html,
+    }),
   });
 
-  if (error) {
-    throw new Error(error.message || "Error al enviar el correo");
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Brevo respondió ${resp.status}: ${errText}`);
   }
-  return data;
+
+  return await resp.json();
 };
 
 module.exports = { sendPasswordResetEmail };
