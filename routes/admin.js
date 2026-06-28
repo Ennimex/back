@@ -3,24 +3,79 @@ const express = require('express');
 const router = express.Router();
 const { authenticate, checkRole } = require('../middlewares/auth');
 const User = require('../models/User');
+const Producto = require('../models/Producto');
+const Categoria = require('../models/Categorias');
+const Localidad = require('../models/Localidades');
+const Talla = require('../models/Tallas');
+const Evento = require('../models/Eventos');
+const Foto = require('../models/Fotos');
+const Video = require('../models/Video');
+const Servicio = require('../models/Servicio');
+const Colaborador = require('../models/Colaboradores');
 
 // Middleware para todas las rutas de admin
 router.use(authenticate, checkRole(['admin']));
 
-// Ruta del dashboard
+// --- Helpers para la tendencia de registros de usuarios ---
+const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+const buildWeek = (fechas) => {
+  const labels = [], data = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
+    const next = new Date(d); next.setDate(d.getDate() + 1);
+    labels.push(DIAS[d.getDay()]);
+    data.push(fechas.filter((f) => f >= d && f < next).length);
+  }
+  return { labels, data };
+};
+
+const buildMonth = (fechas) => {
+  const labels = [], data = [];
+  for (let i = 3; i >= 0; i--) {
+    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - i * 7 - 6);
+    const end = new Date(); end.setHours(23, 59, 59, 999); end.setDate(end.getDate() - i * 7);
+    labels.push(`Sem ${4 - i}`);
+    data.push(fechas.filter((f) => f >= start && f <= end).length);
+  }
+  return { labels, data };
+};
+
+const buildYear = (fechas) => {
+  const year = new Date().getFullYear();
+  const data = new Array(12).fill(0);
+  fechas.forEach((f) => { if (f.getFullYear() === year) data[f.getMonth()]++; });
+  return { labels: MESES, data };
+};
+
+// Ruta del dashboard: conteos reales + tendencia de registros
 router.get('/dashboard', async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
+    const [usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores] =
+      await Promise.all([
+        User.countDocuments(),
+        Producto.countDocuments(),
+        Categoria.countDocuments(),
+        Localidad.countDocuments(),
+        Talla.countDocuments(),
+        Evento.countDocuments(),
+        Foto.countDocuments(),
+        Video.countDocuments(),
+        Servicio.countDocuments(),
+        Colaborador.countDocuments(),
+      ]);
+
+    // Tendencia de registros (a partir de createdAt de los usuarios)
+    const users = await User.find({}, 'createdAt').lean();
+    const fechas = users.map((u) => u.createdAt).filter(Boolean).map((d) => new Date(d));
 
     res.json({
-      message: `Bienvenido, ${req.user.role}`,
-      stats: {
-        totalUsers,
-        totalSales: 0,
-        totalOrders: 0,
-      },
+      counts: { usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores },
+      usersTrend: { week: buildWeek(fechas), month: buildMonth(fechas), year: buildYear(fechas) },
     });
   } catch (error) {
+    console.error('Error en dashboard:', error.message);
     res.status(500).json({ error: 'Error al obtener datos del dashboard' });
   }
 });
