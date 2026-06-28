@@ -82,9 +82,10 @@ app.use(
 // Límite global de peticiones para mitigar abuso
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 300, // 300 peticiones por IP por ventana
+  max: 1000, // 1000 peticiones por IP por ventana (la SPA admin carga varios endpoints por pantalla)
   standardHeaders: true,
   legacyHeaders: false,
+  message: { error: "Demasiadas solicitudes. Espera un momento e inténtalo de nuevo." },
 });
 app.use(globalLimiter);
 
