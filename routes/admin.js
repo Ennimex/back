@@ -13,6 +13,8 @@ const Foto = require('../models/Fotos');
 const Video = require('../models/Video');
 const Servicio = require('../models/Servicio');
 const Colaborador = require('../models/Colaboradores');
+const Solicitud = require('../models/Solicitud');
+const ApiError = require('../utils/ApiError');
 
 // Middleware para todas las rutas de admin
 router.use(authenticate, checkRole(['admin']));
@@ -52,7 +54,7 @@ const buildYear = (fechas) => {
 
 // Ruta del dashboard: conteos reales + tendencia de registros
 router.get('/dashboard', asyncHandler(async (req, res) => {
-  const [usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores] =
+  const [usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores, solicitudes, solicitudesPendientes] =
     await Promise.all([
       User.countDocuments(),
       Producto.countDocuments(),
@@ -64,6 +66,8 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
       Video.countDocuments(),
       Servicio.countDocuments(),
       Colaborador.countDocuments(),
+      Solicitud.countDocuments(),
+      Solicitud.countDocuments({ estado: 'pendiente' }),
     ]);
 
   // Tendencia de registros (a partir de createdAt de los usuarios)
@@ -71,7 +75,7 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
   const fechas = users.map((u) => u.createdAt).filter(Boolean).map((d) => new Date(d));
 
   res.json({
-    counts: { usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores },
+    counts: { usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores, solicitudes, solicitudesPendientes },
     usersTrend: { week: buildWeek(fechas), month: buildMonth(fechas), year: buildYear(fechas) },
   });
 }));
@@ -169,6 +173,42 @@ router.post('/users', asyncHandler(async (req, res) => {
     success: true,
     data: user,
     message: 'Usuario creado exitosamente'
+  });
+}));
+
+// --- Solicitudes de cotización (vista del administrador) ---
+
+// Listar todas las solicitudes (más recientes primero).
+// Los datos de contacto y de los productos ya son un "snapshot" guardado en
+// la propia solicitud, así que no hace falta poblar referencias.
+router.get('/solicitudes', asyncHandler(async (req, res) => {
+  const solicitudes = await Solicitud.find({}).sort({ createdAt: -1 });
+  res.json(solicitudes);
+}));
+
+// Cambiar el estado de una solicitud (pendiente / atendida / cerrada)
+const ESTADOS_SOLICITUD = ['pendiente', 'atendida', 'cerrada'];
+router.patch('/solicitudes/:id', asyncHandler(async (req, res) => {
+  const { estado } = req.body;
+
+  if (!ESTADOS_SOLICITUD.includes(estado)) {
+    throw new ApiError(400, 'Estado inválido. Usa pendiente, atendida o cerrada.');
+  }
+
+  const solicitud = await Solicitud.findByIdAndUpdate(
+    req.params.id,
+    { estado },
+    { new: true, runValidators: true }
+  );
+
+  if (!solicitud) {
+    throw new ApiError(404, 'Solicitud no encontrada');
+  }
+
+  res.json({
+    success: true,
+    data: solicitud,
+    message: 'Estado de la solicitud actualizado',
   });
 }));
 
