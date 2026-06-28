@@ -38,6 +38,7 @@ const configuracionRoutes = require('./routes/configuracionRoutes');
 const contactoRoutes = require('./routes/contactoRoutes');
 const valoresRoutes = require('./routes/valoresRoutes');
 const colaboradoresRoutes = require('./routes/colaboradoresRoutes');
+const favoritosRoutes = require('./routes/favoritosRoutes');
 
 // Middleware de autenticación/autorización
 const { authenticate, isAdmin } = require("./middlewares/auth");
@@ -138,6 +139,8 @@ app.use("/api/contacto", contactoRoutes);
 app.use("/api/valores", valoresRoutes);
 // Colaboradores / equipo (seccion "Nosotros")
 app.use("/api/colaboradores", colaboradoresRoutes);
+// Favoritos / lista de deseos (requiere usuario autenticado)
+app.use("/api/favoritos", authenticate, favoritosRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {

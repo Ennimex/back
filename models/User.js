@@ -51,6 +51,11 @@ const UserSchema = new mongoose.Schema({
     default: false,
   },
   verificationToken: String,
+  // Productos marcados como favoritos por el usuario (lista de deseos)
+  favoritos: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Producto',
+  }],
 });
 
 // Encriptar contraseña antes de guardar
