@@ -35,6 +35,7 @@ const videosRoutes = require("./routes/videosRoutes");
 const eventosRoutes = require('./routes/eventosRoutes');
 const perfilRoutes = require('./routes/perfilRoutes');
 const configuracionRoutes = require('./routes/configuracionRoutes');
+const contactoRoutes = require('./routes/contactoRoutes');
 
 // Middleware de autenticación/autorización
 const { authenticate, isAdmin } = require("./middlewares/auth");
@@ -129,6 +130,8 @@ app.use("/api/eventos", eventosRoutes);
 app.use("/api/perfil", perfilRoutes);
 // Configuración global del sitio (nombre, logo, contacto, redes)
 app.use("/api/configuracion", configuracionRoutes);
+// Formulario de contacto (envía correo al negocio)
+app.use("/api/contacto", contactoRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {

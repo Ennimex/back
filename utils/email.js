@@ -57,4 +57,50 @@ const sendPasswordResetEmail = async (to, resetUrl) => {
   return await resp.json();
 };
 
-module.exports = { sendPasswordResetEmail };
+// Enviar el mensaje del formulario de contacto al correo del negocio.
+const sendContactEmail = async (to, { nombre, email, telefono, mensaje }) => {
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.BREVO_FROM_EMAIL;
+  const fromName = process.env.BREVO_FROM_NAME || "La Aterciopelada";
+
+  if (!apiKey) throw new Error("BREVO_API_KEY no está configurada");
+  if (!fromEmail) throw new Error("BREVO_FROM_EMAIL no está configurada");
+
+  const esc = (s) => String(s || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const html = `
+  <div style="font-family: Arial, Helvetica, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; color: #1f2937;">
+    <h2 style="color: #d63384; font-size: 20px;">Nuevo mensaje de contacto</h2>
+    <p><strong>Nombre:</strong> ${esc(nombre)}</p>
+    <p><strong>Correo:</strong> ${esc(email)}</p>
+    ${telefono ? `<p><strong>Teléfono:</strong> ${esc(telefono)}</p>` : ""}
+    <p><strong>Mensaje:</strong></p>
+    <div style="background:#f8f8f8; border-left:4px solid #d63384; padding:12px 16px; border-radius:6px; white-space:pre-wrap;">${esc(mensaje)}</div>
+    <p style="font-size:12px; color:#9ca3af; margin-top:20px;">Puedes responder directamente a este correo para contactar a ${esc(nombre)}.</p>
+  </div>`;
+
+  const resp = await fetch(BREVO_API_URL, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      "api-key": apiKey,
+    },
+    body: JSON.stringify({
+      sender: { name: fromName, email: fromEmail },
+      to: [{ email: to }],
+      replyTo: { email, name: nombre },
+      subject: `Nuevo mensaje de contacto de ${nombre}`,
+      htmlContent: html,
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`Brevo respondió ${resp.status}: ${errText}`);
+  }
+
+  return await resp.json();
+};
+
+module.exports = { sendPasswordResetEmail, sendContactEmail };

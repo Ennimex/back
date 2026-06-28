@@ -27,43 +27,6 @@ router.put("/servicios/:id", upload.single('imagen'), updateServicio);
 // Rutas para eliminar un servicio
 router.delete("/servicios/:id", deleteServicio);
 
-// RUTAS PARA PROYECTOS
-router.post("/proyectos", async (req, res) => {
-  try {
-    const proyecto = new Proyecto(req.body);
-    await proyecto.save();
-    res.status(201).json(proyecto);
-  } catch (error) {
-    res.status(500).json({ error: "Error al crear proyecto" });
-  }
-});
-
-router.put("/proyectos/:id", async (req, res) => {
-  try {
-    const proyecto = await Proyecto.findByIdAndUpdate(req.params.id, req.body, {
-      new: true
-    });
-    if (!proyecto) {
-      return res.status(404).json({ error: "Proyecto no encontrado" });
-    }
-    res.json(proyecto);
-  } catch (error) {
-    res.status(500).json({ error: "Error al actualizar proyecto" });
-  }
-});
-
-router.delete("/proyectos/:id", async (req, res) => {
-  try {
-    const proyecto = await Proyecto.findByIdAndDelete(req.params.id);
-    if (!proyecto) {
-      return res.status(404).json({ error: "Proyecto no encontrado" });
-    }
-    res.json({ message: "Proyecto eliminado correctamente" });
-  } catch (error) {
-    res.status(500).json({ error: "Error al eliminar proyecto" });
-  }
-});
-
 // RUTAS PARA INFORMACIÓN DE CONTACTO
 router.put("/contacto", async (req, res) => {
   try {
