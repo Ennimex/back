@@ -42,7 +42,9 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  resetPasswordToken: String,
+  // Índice sparse: solo indexa los usuarios con un token de reseteo activo,
+  // para que la búsqueda en /reset-password sea instantánea sin escanear todo.
+  resetPasswordToken: { type: String, index: { sparse: true } },
   resetPasswordExpire: Date,
   emailVerified: {
     type: Boolean,

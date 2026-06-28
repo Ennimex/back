@@ -14,6 +14,9 @@ const EventoSchema = new mongoose.Schema({
   }
 });
 
+// Índice para listar/ordenar por fecha (getEventos hace sort({ fecha: -1 }))
+EventoSchema.index({ fecha: -1 });
+
 // Aplicar middlewares de auto-eliminación
 EventoSchema.pre('save', calcularFechaEliminacion);
 EventoSchema.pre('findOneAndUpdate', calcularFechaEliminacionUpdate);
