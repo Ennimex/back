@@ -18,10 +18,11 @@ const subirImagen = (buffer, folder = "productos") =>
     streamifier.createReadStream(buffer).pipe(stream);
   });
 
-// Poblar referencias de un query de productos (localidad y tallas con categoría)
+// Poblar referencias de un query de productos (localidad, categoría y tallas)
 const poblarProducto = (query) =>
   query
     .populate({ path: "localidadId", select: "nombre descripcion" })
+    .populate({ path: "categoriaId", select: "nombre" })
     .populate({ path: "tallasDisponibles", populate: { path: "categoriaId" } });
 
 // Obtener todos los productos con referencias pobladas
@@ -61,11 +62,17 @@ const createProducto = asyncHandler(async (req, res) => {
     }
   }
 
+  // Validar categoriaId si viene (opcional)
+  if (req.body.categoriaId && !mongoose.Types.ObjectId.isValid(req.body.categoriaId)) {
+    return res.status(400).json({ error: "ID de categoría inválido" });
+  }
+
   // Preparar datos del producto
   const productData = {
     nombre: req.body.nombre,
     descripcion: req.body.descripcion,
     localidadId: req.body.localidadId,
+    categoriaId: req.body.categoriaId || null,
     tipoTela: req.body.tipoTela,
     tallasDisponibles: tallasDisponibles,
     imagenURL: req.body.imagenURL || ""
@@ -106,6 +113,11 @@ const updateProducto = asyncHandler(async (req, res) => {
     return res.status(400).json({ error: "ID de localidad inválido" });
   }
 
+  // categoriaId puede venir con un id válido (asignar), vacío (limpiar) o ausente (no tocar)
+  if (req.body.categoriaId && !mongoose.Types.ObjectId.isValid(req.body.categoriaId)) {
+    return res.status(400).json({ error: "ID de categoría inválido" });
+  }
+
   // Validar tallasDisponibles si se incluyen en la actualización
   if (req.body.tallasDisponibles) {
     const tallasDisponibles = Array.isArray(req.body.tallasDisponibles)
@@ -126,6 +138,7 @@ const updateProducto = asyncHandler(async (req, res) => {
   if (req.body.nombre !== undefined) updateData.nombre = req.body.nombre;
   if (req.body.descripcion !== undefined) updateData.descripcion = req.body.descripcion;
   if (req.body.localidadId !== undefined) updateData.localidadId = req.body.localidadId;
+  if (req.body.categoriaId !== undefined) updateData.categoriaId = req.body.categoriaId || null;
   if (req.body.tipoTela !== undefined) updateData.tipoTela = req.body.tipoTela;
   if (req.body.tallasDisponibles !== undefined) updateData.tallasDisponibles = req.body.tallasDisponibles;
   if (req.body.imagenURL !== undefined) updateData.imagenURL = req.body.imagenURL;

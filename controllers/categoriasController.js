@@ -1,4 +1,5 @@
 const Categoria = require("../models/Categorias");
+const Producto = require("../models/Producto");
 const mongoose = require('mongoose');
 const multer = require("multer");
 const cloudinary = require("../config/cloudinaryConfig");
@@ -25,10 +26,24 @@ const publicIdDesdeUrl = (url) => {
   return `categorias/${publicId}`;
 };
 
-// Obtener todas las categorías
+// Obtener todas las categorías (con el número de productos de cada una)
 const getCategorias = asyncHandler(async (req, res) => {
-  const categorias = await Categoria.find();
-  res.json(categorias);
+  const categorias = await Categoria.find().lean();
+
+  // Contar productos agrupados por categoría en una sola consulta
+  const conteos = await Producto.aggregate([
+    { $match: { categoriaId: { $ne: null } } },
+    { $group: { _id: "$categoriaId", total: { $sum: 1 } } },
+  ]);
+  const mapaConteo = {};
+  conteos.forEach((c) => { mapaConteo[String(c._id)] = c.total; });
+
+  const resultado = categorias.map((c) => ({
+    ...c,
+    productosCount: mapaConteo[String(c._id)] || 0,
+  }));
+
+  res.json(resultado);
 });
 
 // Crear nueva categoría

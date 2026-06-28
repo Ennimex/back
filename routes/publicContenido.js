@@ -58,6 +58,7 @@ router.get('/contacto', asyncHandler(async (req, res) => {
 router.get('/productos', asyncHandler(async (req, res) => {
   const productos = await Producto.find()
     .populate('localidadId')
+    .populate({ path: 'categoriaId', select: 'nombre' })
     .populate({
       path: 'tallasDisponibles',
       populate: {
@@ -71,6 +72,7 @@ router.get('/productos', asyncHandler(async (req, res) => {
 router.get('/productos/:id', asyncHandler(async (req, res) => {
   const producto = await Producto.findById(req.params.id)
     .populate('localidadId')
+    .populate({ path: 'categoriaId', select: 'nombre' })
     .populate({
       path: 'tallasDisponibles',
       populate: {
