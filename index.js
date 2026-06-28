@@ -36,6 +36,7 @@ const eventosRoutes = require('./routes/eventosRoutes');
 const perfilRoutes = require('./routes/perfilRoutes');
 const configuracionRoutes = require('./routes/configuracionRoutes');
 const contactoRoutes = require('./routes/contactoRoutes');
+const valoresRoutes = require('./routes/valoresRoutes');
 
 // Middleware de autenticación/autorización
 const { authenticate, isAdmin } = require("./middlewares/auth");
@@ -132,6 +133,8 @@ app.use("/api/perfil", perfilRoutes);
 app.use("/api/configuracion", configuracionRoutes);
 // Formulario de contacto (envía correo al negocio)
 app.use("/api/contacto", contactoRoutes);
+// Valores de la empresa (seccion "Nosotros")
+app.use("/api/valores", valoresRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {

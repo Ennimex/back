@@ -32,22 +32,20 @@ const getNosotrosById = async (req, res) => {
 // Crear o actualizar información de nosotros
 const createOrUpdateNosotros = async (req, res) => {
   try {
-    const { mision, vision } = req.body;
-    
+    const { mision, vision, historia } = req.body;
+
     let nosotros = await Nosotros.findOne();
-    
+
     if (!nosotros) {
       // Si no existe, crear nuevo
-      nosotros = new Nosotros({ 
-        mision, 
-        vision 
-      });
+      nosotros = new Nosotros({ mision, vision, historia });
     } else {
-      // Si existe, actualizar
-      nosotros.mision = mision;
-      nosotros.vision = vision;
+      // Si existe, actualizar solo los campos enviados
+      if (mision !== undefined) nosotros.mision = mision;
+      if (vision !== undefined) nosotros.vision = vision;
+      if (historia !== undefined) nosotros.historia = historia;
     }
-    
+
     const nosotrosGuardado = await nosotros.save();
     res.status(201).json(nosotrosGuardado);
   } catch (error) {
