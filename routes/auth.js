@@ -17,8 +17,6 @@ const getFrontendBase = () => {
 
 router.post('/login', async (req, res) => {
   try {
-    console.log('🔐 Intento de login:', { email: req.body.email });
-    
     const { email, password } = req.body;
     
     // Validar que los campos estén presentes
@@ -27,14 +25,12 @@ router.post('/login', async (req, res) => {
     }
 
     const user = await User.findOne({ email }).select('+password');
-    console.log('👤 Usuario encontrado:', user ? 'Sí' : 'No');
 
     if (!user) {
       return res.status(401).json({ error: 'Credenciales inválidas - Usuario no encontrado' });
     }
 
     const isPasswordValid = await user.matchPassword(password);
-    console.log('🔑 Contraseña válida:', isPasswordValid ? 'Sí' : 'No');
 
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Credenciales inválidas - Contraseña incorrecta' });
@@ -45,22 +41,14 @@ router.post('/login', async (req, res) => {
     try {
       token = user.getSignedJwtToken();
     } catch (tokenError) {
-      console.error('❌ Error generando JWT token:', tokenError);
-      return res.status(500).json({ 
-        error: 'Error interno del servidor al generar token',
-        details: tokenError.message 
-      });
+      console.error('Error generando JWT token:', tokenError.message);
+      return res.status(500).json({ error: 'Error interno del servidor al generar token' });
     }
 
     const expiresIn = process.env.JWT_EXPIRE || '1h';
-    
-    console.log('✅ Login exitoso para:', user.email);
-    console.log('🕐 JWT_EXPIRE from env:', process.env.JWT_EXPIRE);
-    console.log('🕐 expiresIn value:', expiresIn);
-    
+
     // Calcular la expiración del token correctamente
     const expirationTime = ms(expiresIn);
-    console.log('🕐 expirationTime (ms):', expirationTime);
     const tokenExpiration = new Date(Date.now() + expirationTime).getTime();
     
     res.json({ 
@@ -70,11 +58,8 @@ router.post('/login', async (req, res) => {
       tokenExpiration
     });
   } catch (error) {
-    console.error('❌ Error en login:', error);
-    res.status(500).json({ 
-      error: 'Error en el servidor',
-      details: error.message 
-    });
+    console.error('Error en login:', error.message);
+    res.status(500).json({ error: 'Error en el servidor' });
   }
 });
 
