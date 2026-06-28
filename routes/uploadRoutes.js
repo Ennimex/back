@@ -4,6 +4,7 @@ const cloudinary = require('../config/cloudinaryConfig');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const asyncHandler = require('../utils/asyncHandler');
 
 // Configurar multer para guardar archivos temporalmente
 const storage = multer.diskStorage({
@@ -35,18 +36,18 @@ async function uploadVideoToCloudinary(filePath, options = {}) {
 }
 
 // Ruta para subir imágenes genéricas
-router.post('/imagen', upload.single('imagen'), async (req, res) => {
+router.post('/imagen', upload.single('imagen'), asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se subió ningún archivo' });
+  }
+
+  // Verificar tipo de archivo
+  if (!req.file.mimetype.startsWith('image/')) {
+    fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: 'El archivo no es una imagen válida' });
+  }
+
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No se subió ningún archivo' });
-    }
-
-    // Verificar tipo de archivo
-    if (!req.file.mimetype.startsWith('image/')) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'El archivo no es una imagen válida' });
-    }
-
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: req.body.folder || 'uploads'
     });
@@ -62,31 +63,27 @@ router.post('/imagen', upload.single('imagen'), async (req, res) => {
       format: result.format
     });
   } catch (error) {
-    console.error('Error al subir a Cloudinary:', error);
-    // Limpiar archivo temporal
+    // Limpiar el archivo temporal antes de delegar el error al handler global
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    res.status(500).json({ 
-      error: 'Error al subir el archivo', 
-      detalles: error.message 
-    });
+    throw error;
   }
-});
+}));
 
 // Ruta para subir videos genéricos
-router.post('/video', upload.single('video'), async (req, res) => {
+router.post('/video', upload.single('video'), asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No se subió ningún video' });
+  }
+
+  // Verificar tipo de archivo
+  if (!req.file.mimetype.startsWith('video/')) {
+    fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: 'El archivo no es un video válido' });
+  }
+
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No se subió ningún video' });
-    }
-
-    // Verificar tipo de archivo
-    if (!req.file.mimetype.startsWith('video/')) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'El archivo no es un video válido' });
-    }
-
     // Subir el video a Cloudinary
     const result = await uploadVideoToCloudinary(req.file.path, {
       folder: req.body.folder || 'uploads'
@@ -103,45 +100,33 @@ router.post('/video', upload.single('video'), async (req, res) => {
       resource_type: result.resource_type
     });
   } catch (error) {
-    console.error('Error al subir el video:', error);
-    // Limpiar archivo temporal
+    // Limpiar el archivo temporal antes de delegar el error al handler global
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    res.status(500).json({ 
-      error: 'Error al subir el video',
-      detalles: error.message 
-    });
+    throw error;
   }
-});
+}));
 
 // Ruta para eliminar recursos (funciona para ambos: imágenes y videos)
-router.delete('/eliminar/:public_id', async (req, res) => {
-  try {
-    const { public_id } = req.params;
-    const { resource_type = 'image' } = req.query;
-    
-    // Validar resource_type
-    if (resource_type !== 'image' && resource_type !== 'video') {
-      return res.status(400).json({ error: 'Tipo de recurso no válido' });
-    }
+router.delete('/eliminar/:public_id', asyncHandler(async (req, res) => {
+  const { public_id } = req.params;
+  const { resource_type = 'image' } = req.query;
 
-    const result = await cloudinary.uploader.destroy(public_id, {
-      resource_type
-    });
-    
-    if (result.result === 'ok') {
-      res.json({ message: 'Recurso eliminado correctamente' });
-    } else {
-      res.status(400).json({ error: 'No se pudo eliminar el recurso' });
-    }
-  } catch (error) {
-    console.error('Error al eliminar el recurso:', error);
-    res.status(500).json({ 
-      error: 'Error al eliminar el recurso',
-      detalles: error.message 
-    });
+  // Validar resource_type
+  if (resource_type !== 'image' && resource_type !== 'video') {
+    return res.status(400).json({ error: 'Tipo de recurso no válido' });
   }
-});
+
+  const result = await cloudinary.uploader.destroy(public_id, {
+    resource_type
+  });
+
+  if (result.result === 'ok') {
+    res.json({ message: 'Recurso eliminado correctamente' });
+  } else {
+    res.status(400).json({ error: 'No se pudo eliminar el recurso' });
+  }
+}));
 
 module.exports = router;

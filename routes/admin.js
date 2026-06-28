@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, checkRole } = require('../middlewares/auth');
+const asyncHandler = require('../utils/asyncHandler');
 const User = require('../models/User');
 const Producto = require('../models/Producto');
 const Categoria = require('../models/Categorias');
@@ -50,154 +51,125 @@ const buildYear = (fechas) => {
 };
 
 // Ruta del dashboard: conteos reales + tendencia de registros
-router.get('/dashboard', async (req, res) => {
-  try {
-    const [usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores] =
-      await Promise.all([
-        User.countDocuments(),
-        Producto.countDocuments(),
-        Categoria.countDocuments(),
-        Localidad.countDocuments(),
-        Talla.countDocuments(),
-        Evento.countDocuments(),
-        Foto.countDocuments(),
-        Video.countDocuments(),
-        Servicio.countDocuments(),
-        Colaborador.countDocuments(),
-      ]);
+router.get('/dashboard', asyncHandler(async (req, res) => {
+  const [usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores] =
+    await Promise.all([
+      User.countDocuments(),
+      Producto.countDocuments(),
+      Categoria.countDocuments(),
+      Localidad.countDocuments(),
+      Talla.countDocuments(),
+      Evento.countDocuments(),
+      Foto.countDocuments(),
+      Video.countDocuments(),
+      Servicio.countDocuments(),
+      Colaborador.countDocuments(),
+    ]);
 
-    // Tendencia de registros (a partir de createdAt de los usuarios)
-    const users = await User.find({}, 'createdAt').lean();
-    const fechas = users.map((u) => u.createdAt).filter(Boolean).map((d) => new Date(d));
+  // Tendencia de registros (a partir de createdAt de los usuarios)
+  const users = await User.find({}, 'createdAt').lean();
+  const fechas = users.map((u) => u.createdAt).filter(Boolean).map((d) => new Date(d));
 
-    res.json({
-      counts: { usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores },
-      usersTrend: { week: buildWeek(fechas), month: buildMonth(fechas), year: buildYear(fechas) },
-    });
-  } catch (error) {
-    console.error('Error en dashboard:', error.message);
-    res.status(500).json({ error: 'Error al obtener datos del dashboard' });
-  }
-});
+  res.json({
+    counts: { usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores },
+    usersTrend: { week: buildWeek(fechas), month: buildMonth(fechas), year: buildYear(fechas) },
+  });
+}));
 
 // Obtener todos los usuarios
-router.get('/users', async (req, res) => {
-  try {
-    const users = await User.find({});
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: 'Error al obtener usuarios' });
-  }
-});
+router.get('/users', asyncHandler(async (req, res) => {
+  const users = await User.find({});
+  res.json(users);
+}));
 
 // Editar información de usuario
-router.put('/users/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { name, email, phone, role } = req.body;
-    
-    // Preparar los campos a actualizar
-    const updateData = {};
-    
-    if (name) updateData.name = name;
-    if (phone) updateData.phone = phone;
-    if (role) {
-      if (!['user', 'admin'].includes(role)) {
-        return res.status(400).json({ error: 'Rol inválido' });
-      }
-      updateData.role = role;
-    }
-    
-    // Si se intenta cambiar el correo, verificar que no exista
-    if (email) {
-      const existingUser = await User.findOne({ email, _id: { $ne: userId } });
-      if (existingUser) {
-        return res.status(400).json({ error: 'El correo electrónico ya está en uso por otro usuario' });
-      }
-      updateData.email = email;
-    }
-    
-    // Actualizar usuario
-    const user = await User.findByIdAndUpdate(
-      userId,
-      updateData,
-      { new: true, runValidators: true }
-    );
+router.put('/users/:userId', asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { name, email, phone, role } = req.body;
 
-    if (!user) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
+  // Preparar los campos a actualizar
+  const updateData = {};
 
-    res.json({
-      success: true,
-      data: user,
-      message: 'Usuario actualizado exitosamente'
-    });
-  } catch (error) {
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(val => val.message);
-      return res.status(400).json({ error: messages });
-    }
-    res.status(500).json({ error: 'Error al actualizar el usuario' });
-  }
-});
-
-// Eliminar usuario
-router.delete('/users/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const user = await User.findByIdAndDelete(userId);
-
-    if (!user) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-
-    res.json({ message: 'Usuario eliminado exitosamente' });
-  } catch (error) {
-    res.status(500).json({ error: 'Error al eliminar usuario' });
-  }
-});
-
-// Agregar un nuevo usuario
-router.post('/users', async (req, res) => {
-  try {
-    const { name, email, phone, password, role = 'user' } = req.body;
-
-    // Validar que el correo no exista
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: 'El correo electrónico ya está registrado' });
-    }
-
-    // Validar rol
-    if (role && !['user', 'admin'].includes(role)) {
+  if (name) updateData.name = name;
+  if (phone) updateData.phone = phone;
+  if (role) {
+    if (!['user', 'admin'].includes(role)) {
       return res.status(400).json({ error: 'Rol inválido' });
     }
-
-    // Crear nuevo usuario
-    const user = await User.create({
-      name,
-      email,
-      phone,
-      password,
-      role
-    });
-
-    // Eliminar la contraseña del objeto de respuesta
-    user.password = undefined;
-
-    res.status(201).json({
-      success: true,
-      data: user,
-      message: 'Usuario creado exitosamente'
-    });
-  } catch (error) {
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(val => val.message);
-      return res.status(400).json({ error: messages });
-    }
-    res.status(500).json({ error: 'Error al crear el usuario' });
+    updateData.role = role;
   }
-});
+
+  // Si se intenta cambiar el correo, verificar que no exista
+  if (email) {
+    const existingUser = await User.findOne({ email, _id: { $ne: userId } });
+    if (existingUser) {
+      return res.status(400).json({ error: 'El correo electrónico ya está en uso por otro usuario' });
+    }
+    updateData.email = email;
+  }
+
+  // Actualizar usuario
+  const user = await User.findByIdAndUpdate(
+    userId,
+    updateData,
+    { new: true, runValidators: true }
+  );
+
+  if (!user) {
+    return res.status(404).json({ error: 'Usuario no encontrado' });
+  }
+
+  res.json({
+    success: true,
+    data: user,
+    message: 'Usuario actualizado exitosamente'
+  });
+}));
+
+// Eliminar usuario
+router.delete('/users/:userId', asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const user = await User.findByIdAndDelete(userId);
+
+  if (!user) {
+    return res.status(404).json({ error: 'Usuario no encontrado' });
+  }
+
+  res.json({ message: 'Usuario eliminado exitosamente' });
+}));
+
+// Agregar un nuevo usuario
+router.post('/users', asyncHandler(async (req, res) => {
+  const { name, email, phone, password, role = 'user' } = req.body;
+
+  // Validar que el correo no exista
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return res.status(400).json({ error: 'El correo electrónico ya está registrado' });
+  }
+
+  // Validar rol
+  if (role && !['user', 'admin'].includes(role)) {
+    return res.status(400).json({ error: 'Rol inválido' });
+  }
+
+  // Crear nuevo usuario
+  const user = await User.create({
+    name,
+    email,
+    phone,
+    password,
+    role
+  });
+
+  // Eliminar la contraseña del objeto de respuesta
+  user.password = undefined;
+
+  res.status(201).json({
+    success: true,
+    data: user,
+    message: 'Usuario creado exitosamente'
+  });
+}));
 
 module.exports = router;

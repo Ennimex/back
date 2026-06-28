@@ -3,172 +3,128 @@ const mongoose = require('mongoose');
 const multer = require("multer");
 const cloudinary = require("../config/cloudinaryConfig");
 const streamifier = require("streamifier");
+const asyncHandler = require("../utils/asyncHandler");
 
 // Configurar almacenamiento de imágenes en memoria (para Cloudinary)
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// Obtener todas las categorías
-const getCategorias = async (req, res) => {
-    try {
-        const categorias = await Categoria.find();
-        res.json(categorias);
-    } catch (error) {
-        console.error("Error al obtener categorías:", error);
-        res.status(500).json({
-            error: "Error al obtener categorías",
-            detalles: error.message
-        });
-    }
+// Subir un buffer de imagen a Cloudinary (promesa sobre upload_stream)
+const subirImagen = (buffer, folder = "categorias") =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream({ folder }, (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    });
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
+
+// Derivar el public_id de Cloudinary a partir de la URL guardada
+const publicIdDesdeUrl = (url) => {
+  const publicId = url.split('/').pop().split('.')[0];
+  return `categorias/${publicId}`;
 };
+
+// Obtener todas las categorías
+const getCategorias = asyncHandler(async (req, res) => {
+  const categorias = await Categoria.find();
+  res.json(categorias);
+});
 
 // Crear nueva categoría
-const createCategoria = async (req, res) => {
-    try {
-        const nuevaCategoria = new Categoria({
-            nombre: req.body.nombre,
-            descripcion: req.body.descripcion,
-            imagenURL: req.body.imagenURL || "" // Puede venir vacío o desde Cloudinary luego
-        });
+const createCategoria = asyncHandler(async (req, res) => {
+  const nuevaCategoria = new Categoria({
+    nombre: req.body.nombre,
+    descripcion: req.body.descripcion,
+    imagenURL: req.body.imagenURL || "" // Puede venir vacío o desde Cloudinary luego
+  });
 
-        const categoriaGuardada = await nuevaCategoria.save();
-        res.status(201).json({
-            mensaje: "Categoría creada correctamente",
-            categoria: categoriaGuardada
-        });
-    } catch (error) {
-        console.error("Error al crear categoría:", error);
-        res.status(400).json({
-            error: "Error al crear categoría",
-            detalles: error.message
-        });
-    }
-};
+  const categoriaGuardada = await nuevaCategoria.save();
+  res.status(201).json({
+    mensaje: "Categoría creada correctamente",
+    categoria: categoriaGuardada
+  });
+});
 
 // Actualizar una categoría
-const updateCategoria = async (req, res) => {
-    try {
-        const { id } = req.params;
+const updateCategoria = asyncHandler(async (req, res) => {
+  const { id } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ error: "ID de categoría inválido" });
-        }
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "ID de categoría inválido" });
+  }
 
-        const categoriaExistente = await Categoria.findById(id);
-        if (!categoriaExistente) {
-            return res.status(404).json({ mensaje: "Categoría no encontrada" });
-        }
+  const categoriaExistente = await Categoria.findById(id);
+  if (!categoriaExistente) {
+    return res.status(404).json({ mensaje: "Categoría no encontrada" });
+  }
 
-        const updateData = {
-            nombre: req.body.nombre,
-            descripcion: req.body.descripcion
-        };
+  const updateData = {
+    nombre: req.body.nombre,
+    descripcion: req.body.descripcion
+  };
 
-        if (req.file) {
-            const uploadStream = cloudinary.uploader.upload_stream(
-                { folder: "categorias" },
-                async (error, result) => {
-                    if (error) {
-                        return res.status(500).json({
-                            error: "Error al subir la imagen",
-                            detalles: error.message
-                        });
-                    }
+  // Si viene una nueva imagen, subirla y borrar la anterior
+  if (req.file) {
+    const result = await subirImagen(req.file.buffer);
 
-                    // Eliminar imagen anterior si existe
-                    if (categoriaExistente.imagenURL) {
-                        const publicId = categoriaExistente.imagenURL.split('/').pop().split('.')[0];
-                        try {
-                            await cloudinary.uploader.destroy(`categorias/${publicId}`);
-                        } catch (cloudinaryError) {
-                            console.error("Error al eliminar imagen antigua:", cloudinaryError);
-                        }
-                    }
-
-                    updateData.imagenURL = result.secure_url;
-
-                    // Actualizar categoría con nueva imagen
-                    try {
-                        const categoriaActualizada = await Categoria.findByIdAndUpdate(
-                            id,
-                            updateData,
-                            { new: true, runValidators: true }
-                        );
-                        res.json({
-                            mensaje: "Categoría actualizada correctamente",
-                            categoria: categoriaActualizada
-                        });
-                    } catch (updateError) {
-                        res.status(400).json({
-                            error: "Error al actualizar categoría",
-                            detalles: updateError.message
-                        });
-                    }
-                }
-            );
-
-            streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
-        } else {
-            const categoriaActualizada = await Categoria.findByIdAndUpdate(
-                id,
-                updateData,
-                { new: true, runValidators: true }
-            );
-            res.json({
-                mensaje: "Categoría actualizada correctamente",
-                categoria: categoriaActualizada
-            });
-        }
-    } catch (error) {
-        res.status(500).json({
-            error: "Error al actualizar categoría",
-            detalles: error.message
-        });
+    if (categoriaExistente.imagenURL) {
+      try {
+        await cloudinary.uploader.destroy(publicIdDesdeUrl(categoriaExistente.imagenURL));
+      } catch (cloudinaryError) {
+        console.error("Error al eliminar imagen antigua:", cloudinaryError.message);
+      }
     }
-};
+
+    updateData.imagenURL = result.secure_url;
+  }
+
+  const categoriaActualizada = await Categoria.findByIdAndUpdate(
+    id,
+    updateData,
+    { new: true, runValidators: true }
+  );
+
+  res.json({
+    mensaje: "Categoría actualizada correctamente",
+    categoria: categoriaActualizada
+  });
+});
 
 // Eliminar una categoría
-const deleteCategoria = async (req, res) => {
+const deleteCategoria = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ error: "ID de categoría inválido" });
+  }
+
+  const categoria = await Categoria.findById(id);
+  if (!categoria) {
+    return res.status(404).json({ mensaje: "Categoría no encontrada" });
+  }
+
+  // Eliminar imagen de Cloudinary si existe
+  if (categoria.imagenURL) {
     try {
-        const { id } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ error: "ID de categoría inválido" });
-        }
-
-        const categoria = await Categoria.findById(id);
-        if (!categoria) {
-            return res.status(404).json({ mensaje: "Categoría no encontrada" });
-        }
-
-        // Eliminar imagen de Cloudinary si existe
-        if (categoria.imagenURL) {
-            const publicId = categoria.imagenURL.split('/').pop().split('.')[0];
-            try {
-                await cloudinary.uploader.destroy(`categorias/${publicId}`);
-            } catch (cloudinaryError) {
-                console.error("Error al eliminar imagen de Cloudinary:", cloudinaryError);
-            }
-        }
-
-        await Categoria.findByIdAndDelete(id);
-        res.json({
-            mensaje: "Categoría eliminada correctamente",
-            categoriaEliminada: categoria
-        });
-    } catch (error) {
-        res.status(500).json({
-            error: "Error al eliminar categoría",
-            detalles: error.message
-        });
+      await cloudinary.uploader.destroy(publicIdDesdeUrl(categoria.imagenURL));
+    } catch (cloudinaryError) {
+      console.error("Error al eliminar imagen de Cloudinary:", cloudinaryError.message);
     }
-};
+  }
+
+  await Categoria.findByIdAndDelete(id);
+  res.json({
+    mensaje: "Categoría eliminada correctamente",
+    categoriaEliminada: categoria
+  });
+});
 
 // Exportar controladores
 module.exports = {
-    getCategorias,
-    createCategoria,
-    updateCategoria,
-    deleteCategoria,
-    upload
+  getCategorias,
+  createCategoria,
+  updateCategoria,
+  deleteCategoria,
+  upload
 };

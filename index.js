@@ -149,16 +149,55 @@ app.use((req, res) => {
   res.status(404).json({ error: "Ruta no encontrada" });
 });
 
-// Manejador de errores global (no filtra detalles internos en producción)
+// Manejador de errores global.
+// - Los errores "confiables" (ApiError lanzado a propósito, o errores típicos
+//   de Mongoose que sabemos traducir) muestran su mensaje al cliente.
+// - Cualquier otro error es "inesperado": se registra y se responde con un
+//   mensaje genérico, sin filtrar el detalle interno (salvo en desarrollo).
 app.use((err, req, res, next) => {
   if (err.message === "Origen no permitido por CORS") {
     return res.status(403).json({ error: "Origen no permitido por CORS" });
   }
-  console.error("Error no controlado:", err.message);
-  const esProd = process.env.NODE_ENV === "production";
-  res.status(err.status || 500).json({
-    error: "Error interno del servidor",
-    ...(esProd ? {} : { detalles: err.message }),
+
+  let status = err.statusCode || 500;
+  let message = err.message || "Error interno del servidor";
+  // ApiError siempre trae statusCode → su mensaje es seguro de mostrar
+  let esConfiable = Boolean(err.statusCode);
+
+  // Traducir errores típicos de Mongoose a respuestas claras (400)
+  if (err.name === "ValidationError") {
+    status = 400;
+    esConfiable = true;
+    message = Object.values(err.errors).map((e) => e.message).join(", ");
+  } else if (err.name === "CastError") {
+    status = 400;
+    esConfiable = true;
+    message = "Identificador inválido";
+  } else if (err.code === 11000) {
+    status = 400;
+    esConfiable = true;
+    const campo = Object.keys(err.keyValue || {})[0];
+    message = campo ? `Ya existe un registro con ese ${campo}` : "Registro duplicado";
+  }
+
+  // Error inesperado: registrar y ocultar el detalle interno al cliente
+  if (!esConfiable) {
+    console.error("Error no controlado:", err.message);
+    const esProd = process.env.NODE_ENV === "production";
+    return res.status(500).json({
+      error: "Error interno del servidor",
+      message: "Error interno del servidor",
+      success: false,
+      ...(esProd ? {} : { detalles: err.message }),
+    });
+  }
+
+  // Error confiable: se muestra su mensaje. Se incluyen `error` y `message`
+  // porque distintos consumidores del frontend leen una u otra clave.
+  res.status(status).json({
+    error: message,
+    message,
+    success: false,
   });
 });
 
