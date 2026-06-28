@@ -37,6 +37,7 @@ const perfilRoutes = require('./routes/perfilRoutes');
 const configuracionRoutes = require('./routes/configuracionRoutes');
 const contactoRoutes = require('./routes/contactoRoutes');
 const valoresRoutes = require('./routes/valoresRoutes');
+const colaboradoresRoutes = require('./routes/colaboradoresRoutes');
 
 // Middleware de autenticación/autorización
 const { authenticate, isAdmin } = require("./middlewares/auth");
@@ -135,6 +136,8 @@ app.use("/api/configuracion", configuracionRoutes);
 app.use("/api/contacto", contactoRoutes);
 // Valores de la empresa (seccion "Nosotros")
 app.use("/api/valores", valoresRoutes);
+// Colaboradores / equipo (seccion "Nosotros")
+app.use("/api/colaboradores", colaboradoresRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {
