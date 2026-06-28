@@ -2,7 +2,16 @@ const Foto = require('../models/Fotos');
 const cloudinary = require('../config/cloudinaryConfig');
 const multer = require('multer');
 const streamifier = require('streamifier'); // importar para manejar streams
+const mongoose = require('mongoose');
 const asyncHandler = require('../utils/asyncHandler');
+
+// Normaliza el eventoId recibido: '' / undefined -> null; valida ObjectId si viene
+const parseEventoId = (valor) => {
+  if (valor === undefined) return undefined; // no tocar
+  if (!valor) return null; // limpiar
+  if (!mongoose.Types.ObjectId.isValid(valor)) return undefined; // inválido -> ignorar
+  return valor;
+};
 
 // Configurar multer para usar memoria en lugar de disco (compatible con Vercel)
 const storage = multer.memoryStorage();
@@ -61,7 +70,8 @@ const createFoto = asyncHandler(async (req, res) => {
   const nuevaFoto = new Foto({
     url: result.secure_url,
     titulo: req.body.titulo || 'Sin título',
-    descripcion: req.body.descripcion || ''
+    descripcion: req.body.descripcion || '',
+    eventoId: parseEventoId(req.body.eventoId) || null
   });
 
   const fotoGuardada = await nuevaFoto.save();
@@ -86,6 +96,8 @@ const updateFoto = asyncHandler(async (req, res) => {
   const updateData = {};
   if (titulo) updateData.titulo = titulo;
   if (descripcion) updateData.descripcion = descripcion;
+  const ev = parseEventoId(req.body.eventoId);
+  if (ev !== undefined) updateData.eventoId = ev;
 
   // Si hay una nueva imagen, subirla y borrar la anterior
   if (req.file) {

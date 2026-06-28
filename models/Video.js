@@ -9,6 +9,13 @@ const VideoSchema = new mongoose.Schema({
   formato: String, // Formato del video (mp4, mov, etc.)
   miniatura: String, // URL de la miniatura generada
   miniaturaPublicId: String, // ID público de la miniatura en Cloudinary
+  // Evento al que pertenece el video (opcional)
+  eventoId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Eventos',
+    default: null,
+    index: true
+  },
   fechaSubida: {
     type: Date,
     default: Date.now

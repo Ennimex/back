@@ -2,7 +2,16 @@ const Video = require('../models/Video');
 const cloudinary = require('../config/cloudinaryConfig');
 const multer = require('multer');
 const streamifier = require('streamifier'); // importar para manejar streams
+const mongoose = require('mongoose');
 const asyncHandler = require('../utils/asyncHandler');
+
+// Normaliza el eventoId recibido: '' / undefined -> null; valida ObjectId si viene
+const parseEventoId = (valor) => {
+  if (valor === undefined) return undefined; // no tocar
+  if (!valor) return null; // limpiar
+  if (!mongoose.Types.ObjectId.isValid(valor)) return undefined; // inválido -> ignorar
+  return valor;
+};
 
 // Configurar multer para usar memoria en lugar de disco (compatible con Vercel)
 const storage = multer.memoryStorage();
@@ -130,7 +139,8 @@ const createVideo = asyncHandler(async (req, res) => {
     duracion: result.duration || 0,
     formato: result.format || '',
     miniatura: miniatura ? miniatura.url : null,
-    miniaturaPublicId: miniatura ? miniatura.publicId : null
+    miniaturaPublicId: miniatura ? miniatura.publicId : null,
+    eventoId: parseEventoId(req.body.eventoId) || null
   });
 
   const videoGuardado = await nuevoVideo.save();
@@ -161,6 +171,8 @@ const updateVideo = asyncHandler(async (req, res) => {
   const updateData = {};
   if (titulo) updateData.titulo = titulo;
   if (descripcion) updateData.descripcion = descripcion;
+  const ev = parseEventoId(req.body.eventoId);
+  if (ev !== undefined) updateData.eventoId = ev;
 
   // Si hay un nuevo video, subirlo y borrar el anterior
   if (req.file) {

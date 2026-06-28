@@ -55,21 +55,6 @@ const updateEvento = asyncHandler(async (req, res) => {
   // Preparar datos de actualización
   const updateData = { titulo, descripcion, fecha: fechaEvento, ubicacion, horaInicio, horaFin };
 
-  // Recalcular fecha de eliminación si se cambió la fecha o hora del evento
-  if (fecha || horaFin) {
-    const fechaEventoActualizada = fechaEvento || new Date();
-
-    if (horaFin) {
-      const [horas, minutos] = horaFin.split(':');
-      fechaEventoActualizada.setHours(parseInt(horas), parseInt(minutos), 0, 0);
-    } else {
-      fechaEventoActualizada.setHours(23, 59, 59, 999);
-    }
-
-    // Agregar 12 horas para la eliminación automática
-    updateData.fechaEliminacion = new Date(fechaEventoActualizada.getTime() + (12 * 60 * 60 * 1000));
-  }
-
   const eventoActualizado = await Evento.findByIdAndUpdate(
     req.params.id,
     updateData,
