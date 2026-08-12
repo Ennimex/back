@@ -46,12 +46,23 @@ const getCategorias = asyncHandler(async (req, res) => {
   res.json(resultado);
 });
 
-// Crear nueva categoría
+// Crear nueva categoría (acepta imagen adjunta igual que updateCategoria)
 const createCategoria = asyncHandler(async (req, res) => {
+  const duplicada = await Categoria.findOne({ nombre: req.body.nombre });
+  if (duplicada) {
+    return res.status(400).json({ error: "Ya existe una categoría con ese nombre" });
+  }
+
+  let imagenURL = req.body.imagenURL || "";
+  if (req.file) {
+    const result = await subirImagen(req.file.buffer);
+    imagenURL = result.secure_url;
+  }
+
   const nuevaCategoria = new Categoria({
     nombre: req.body.nombre,
     descripcion: req.body.descripcion,
-    imagenURL: req.body.imagenURL || "" // Puede venir vacío o desde Cloudinary luego
+    imagenURL
   });
 
   const categoriaGuardada = await nuevaCategoria.save();
@@ -129,6 +140,10 @@ const deleteCategoria = asyncHandler(async (req, res) => {
   }
 
   await Categoria.findByIdAndDelete(id);
+
+  // Desvincular los productos que apuntaban a esta categoría (evita referencias colgantes)
+  await Producto.updateMany({ categoriaId: id }, { $set: { categoriaId: null } });
+
   res.json({
     mensaje: "Categoría eliminada correctamente",
     categoriaEliminada: categoria
