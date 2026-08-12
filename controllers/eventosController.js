@@ -1,10 +1,30 @@
 const Evento = require('../models/Eventos');
+const Foto = require('../models/Fotos');
+const Video = require('../models/Video');
 const asyncHandler = require('../utils/asyncHandler');
 
-// Obtener todos los eventos
+// Obtener todos los eventos, con el total de fotos y videos de su galería
+// (totalFotos / totalVideos) para que el panel muestre el estado de un vistazo.
 const getEventos = asyncHandler(async (req, res) => {
-  const eventos = await Evento.find().sort({ fecha: -1 });
-  res.json(eventos);
+  const [eventos, fotosPorEvento, videosPorEvento] = await Promise.all([
+    Evento.find().sort({ fecha: -1 }).lean(),
+    Foto.aggregate([
+      { $match: { eventoId: { $ne: null } } },
+      { $group: { _id: '$eventoId', total: { $sum: 1 } } },
+    ]),
+    Video.aggregate([
+      { $match: { eventoId: { $ne: null } } },
+      { $group: { _id: '$eventoId', total: { $sum: 1 } } },
+    ]),
+  ]);
+  const aMapa = (lista) => Object.fromEntries(lista.map((x) => [String(x._id), x.total]));
+  const nFotos = aMapa(fotosPorEvento);
+  const nVideos = aMapa(videosPorEvento);
+  res.json(eventos.map((e) => ({
+    ...e,
+    totalFotos: nFotos[String(e._id)] || 0,
+    totalVideos: nVideos[String(e._id)] || 0,
+  })));
 });
 
 // Obtener un evento por ID
@@ -16,9 +36,16 @@ const getEventoById = asyncHandler(async (req, res) => {
   res.json(evento);
 });
 
-// Crear nuevo evento
+// Crear nuevo evento. Solo título y fecha son obligatorios; el resto es opcional.
 const createEvento = asyncHandler(async (req, res) => {
   const { titulo, descripcion, fecha, ubicacion, horaInicio, horaFin } = req.body;
+
+  if (!titulo || !String(titulo).trim()) {
+    return res.status(400).json({ error: 'El título del evento es obligatorio' });
+  }
+  if (!fecha || isNaN(new Date(fecha).getTime())) {
+    return res.status(400).json({ error: 'La fecha del evento es obligatoria' });
+  }
 
   // Ajustar la fecha para evitar problemas de zona horaria
   let fechaEvento = fecha;
@@ -40,9 +67,16 @@ const createEvento = asyncHandler(async (req, res) => {
   res.status(201).json(eventoGuardado);
 });
 
-// Actualizar evento
+// Actualizar evento. Igual que en crear: título y fecha obligatorios.
 const updateEvento = asyncHandler(async (req, res) => {
   const { titulo, descripcion, fecha, ubicacion, horaInicio, horaFin } = req.body;
+
+  if (!titulo || !String(titulo).trim()) {
+    return res.status(400).json({ error: 'El título del evento es obligatorio' });
+  }
+  if (!fecha || isNaN(new Date(fecha).getTime())) {
+    return res.status(400).json({ error: 'La fecha del evento es obligatoria' });
+  }
 
   // Ajustar la fecha para evitar problemas de zona horaria
   let fechaEvento = fecha;
@@ -66,12 +100,17 @@ const updateEvento = asyncHandler(async (req, res) => {
   res.json(eventoActualizado);
 });
 
-// Eliminar evento
+// Eliminar evento. Sus fotos/videos no se borran: se desvinculan (eventoId: null)
+// para que vuelvan a aparecer en la galería general en vez de quedar huérfanos.
 const deleteEvento = asyncHandler(async (req, res) => {
   const eventoEliminado = await Evento.findByIdAndDelete(req.params.id);
   if (!eventoEliminado) {
     return res.status(404).json({ error: 'Evento no encontrado' });
   }
+  await Promise.all([
+    Foto.updateMany({ eventoId: eventoEliminado._id }, { $set: { eventoId: null } }),
+    Video.updateMany({ eventoId: eventoEliminado._id }, { $set: { eventoId: null } }),
+  ]);
   res.json({ mensaje: 'Evento eliminado correctamente' });
 });
 

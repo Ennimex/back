@@ -44,9 +44,16 @@ const publicIdDesdeUrl = (url) => {
   return 'galeria/fotos/' + urlParts[urlParts.length - 1].split('.')[0];
 };
 
-// Obtener todas las fotos
+// Obtener todas las fotos.
+// Filtros opcionales: ?eventoId=<id> (fotos de un evento) o ?eventoId=null (fotos sin evento)
 const getFotos = asyncHandler(async (req, res) => {
-  const fotos = await Foto.find().sort({ _id: -1 }); // Más recientes primero
+  const { eventoId } = req.query;
+  const filtro = {};
+  if (eventoId !== undefined) {
+    if (mongoose.Types.ObjectId.isValid(eventoId)) filtro.eventoId = eventoId;
+    else if (eventoId === 'null' || eventoId === '') filtro.eventoId = null;
+  }
+  const fotos = await Foto.find(filtro).sort({ _id: -1 }); // Más recientes primero
   res.json(fotos);
 });
 

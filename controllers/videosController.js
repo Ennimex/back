@@ -100,9 +100,16 @@ async function uploadVideoToCloudinary(buffer, options = {}) {
   }
 }
 
-// Obtener todos los videos
+// Obtener todos los videos.
+// Filtros opcionales: ?eventoId=<id> (videos de un evento) o ?eventoId=null (videos sin evento)
 const getVideos = asyncHandler(async (req, res) => {
-  const videos = await Video.find().sort({ _id: -1 }); // Más recientes primero
+  const { eventoId } = req.query;
+  const filtro = {};
+  if (eventoId !== undefined) {
+    if (mongoose.Types.ObjectId.isValid(eventoId)) filtro.eventoId = eventoId;
+    else if (eventoId === 'null' || eventoId === '') filtro.eventoId = null;
+  }
+  const videos = await Video.find(filtro).sort({ _id: -1 }); // Más recientes primero
   res.json(videos);
 });
 
