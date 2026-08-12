@@ -101,10 +101,10 @@ router.get('/users', asyncHandler(async (req, res) => {
   res.json(users);
 }));
 
-// Editar información de usuario
+// Editar información de usuario (incluida la contraseña, opcional)
 router.put('/users/:userId', asyncHandler(async (req, res) => {
   const { userId } = req.params;
-  const { name, email, phone, role } = req.body;
+  const { name, email, phone, role, password } = req.body;
 
   // Preparar los campos a actualizar
   const updateData = {};
@@ -127,16 +127,23 @@ router.put('/users/:userId', asyncHandler(async (req, res) => {
     updateData.email = email;
   }
 
-  // Actualizar usuario
-  const user = await User.findByIdAndUpdate(
-    userId,
-    updateData,
-    { new: true, runValidators: true }
-  );
+  // Cambio de contraseña: antes se ignoraba en silencio (findByIdAndUpdate
+  // se salta el hook pre-save que la hashea). Se valida y se guarda con save().
+  if (password) {
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres' });
+    }
+    updateData.password = password;
+  }
 
+  // Cargar y guardar con save() para que corran los validadores y el hash
+  const user = await User.findById(userId);
   if (!user) {
     return res.status(404).json({ error: 'Usuario no encontrado' });
   }
+  Object.assign(user, updateData);
+  await user.save();
+  user.password = undefined;
 
   res.json({
     success: true,
