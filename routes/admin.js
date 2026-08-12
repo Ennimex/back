@@ -70,13 +70,28 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
       Solicitud.countDocuments({ estado: 'pendiente' }),
     ]);
 
-  // Tendencia de registros (a partir de createdAt de los usuarios)
-  const users = await User.find({}, 'createdAt').lean();
+  // Tendencia de registros (a partir de createdAt de los usuarios) y
+  // "recientes" para las listas del panel — solo los campos que se muestran,
+  // para que el dashboard no tenga que descargar colecciones completas.
+  const [users, usuariosRecientes, productosRecientes, categoriasRecientes, solicitudesRecientes] =
+    await Promise.all([
+      User.find({}, 'createdAt').lean(),
+      User.find({}, 'name email role createdAt').sort({ createdAt: -1 }).limit(5).lean(),
+      Producto.find({}, 'nombre createdAt').sort({ _id: -1 }).limit(3).lean(),
+      Categoria.find({}, 'nombre createdAt').sort({ _id: -1 }).limit(2).lean(),
+      Solicitud.find({}, 'nombre estado productos createdAt').sort({ _id: -1 }).limit(4).lean(),
+    ]);
   const fechas = users.map((u) => u.createdAt).filter(Boolean).map((d) => new Date(d));
 
   res.json({
     counts: { usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores, solicitudes, solicitudesPendientes },
     usersTrend: { week: buildWeek(fechas), month: buildMonth(fechas), year: buildYear(fechas) },
+    recientes: {
+      usuarios: usuariosRecientes,
+      productos: productosRecientes,
+      categorias: categoriasRecientes,
+      solicitudes: solicitudesRecientes,
+    },
   });
 }));
 

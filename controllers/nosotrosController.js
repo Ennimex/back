@@ -36,13 +36,21 @@ const createOrUpdateNosotros = asyncHandler(async (req, res) => {
   res.status(201).json(nosotrosGuardado);
 });
 
-// Actualizar información de nosotros
+// Actualizar información de nosotros.
+// Solo toca los campos enviados: este documento lo editan dos páginas del
+// panel (Misión/Visión e Historia) y escribir campos no enviados haría que
+// una pisara lo guardado por la otra.
 const updateNosotros = asyncHandler(async (req, res) => {
-  const { mision, vision } = req.body;
+  const { mision, vision, historia } = req.body;
+
+  const updateData = {};
+  if (mision !== undefined) updateData.mision = mision;
+  if (vision !== undefined) updateData.vision = vision;
+  if (historia !== undefined) updateData.historia = historia;
 
   const nosotrosActualizado = await Nosotros.findByIdAndUpdate(
     req.params.id,
-    { mision, vision },
+    { $set: updateData },
     { new: true, runValidators: true }
   );
 
