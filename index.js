@@ -104,7 +104,10 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" })); // Parsear solici
 
 // Conexión a la base de datos (si está en config)
 const db = require("./config/db");
-db.connect();
+// En pruebas, tests/setup.js conecta mongoose a un Mongo en memoria.
+if (process.env.NODE_ENV !== "test") {
+  db.connect();
+}
 
 // Rutas públicas (sin autenticación) — con límite estricto anti fuerza bruta
 app.use("/api/auth", authLimiter, authRoutes); // Login/registro
@@ -208,10 +211,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Iniciar el servidor
+// Iniciar el servidor (no en pruebas: supertest usa la app directamente)
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
-});
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
+  });
+}
 
 module.exports = app; // Exportar la aplicación para pruebas u otros usos

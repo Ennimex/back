@@ -1,0 +1,7 @@
+# Decisión sobre scripts de instalación (build) de dependencias de prueba.
+# mongodb-memory-server descarga el binario de MongoDB para las pruebas;
+# @parcel/watcher y unrs-resolver instalan binarios precompilados de jest.
+allowBuilds:
+  mongodb-memory-server: true
+  '@parcel/watcher': true
+  unrs-resolver: true
