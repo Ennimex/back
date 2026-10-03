@@ -5,7 +5,7 @@ const asyncHandler = require('../utils/asyncHandler');
 // Importar los modelos
 const Nosotros = require('../models/Nosotros');
 const Servicio = require('../models/Servicio');
-const Contacto = require('../models/Contacto');
+const ConfiguracionSitio = require('../models/ConfiguracionSitio');
 const Localidad = require('../models/Localidades');
 const Tallas = require('../models/Tallas');
 const Categorias = require("../models/Categorias");
@@ -49,9 +49,17 @@ router.get('/categorias', asyncHandler(async (req, res) => {
 }));
 
 // Obtener información de contacto
+// Datos de contacto públicos: salen de la configuración del sitio (editable
+// desde el panel). Antes leían un modelo "Contacto" duplicado que nadie llenaba.
 router.get('/contacto', asyncHandler(async (req, res) => {
-  const contacto = await Contacto.findOne();
-  res.json(contacto || {});
+  const config = await ConfiguracionSitio.findOne().lean();
+  res.json({
+    telefono: (config && config.telefono) || '',
+    email: (config && config.email) || '',
+    direccion: (config && config.direccion) || '',
+    horarios: (config && config.horarios) || '',
+    redesSociales: (config && config.redesSociales) || {},
+  });
 }));
 
 // Ruta pública para obtener todos los productos con sus relaciones

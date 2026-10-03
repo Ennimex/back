@@ -6,7 +6,6 @@ const asyncHandler = require("../utils/asyncHandler");
 // Importar los modelos necesarios (deberás crearlos)
 const Nosotros = require("../models/Nosotros");
 const Servicio = require("../models/Servicio");
-const Contacto = require("../models/Contacto");
 const Categoria = require("../models/Categorias");
 
 // Importar controladores
@@ -28,23 +27,8 @@ router.put("/servicios/:id", upload.single('imagen'), updateServicio);
 // Rutas para eliminar un servicio
 router.delete("/servicios/:id", deleteServicio);
 
-// RUTAS PARA INFORMACIÓN DE CONTACTO
-router.put("/contacto", asyncHandler(async (req, res) => {
-  const { direccion, telefono, email, horario } = req.body;
-  let contacto = await Contacto.findOne();
-
-  if (!contacto) {
-    contacto = new Contacto({ direccion, telefono, email, horario });
-  } else {
-    contacto.direccion = direccion;
-    contacto.telefono = telefono;
-    contacto.email = email;
-    contacto.horario = horario;
-  }
-
-  await contacto.save();
-  res.json(contacto);
-}));
+// Los datos de contacto se editan en /api/configuracion (ConfiguracionSitio);
+// la ruta PUT /contacto que escribía al modelo duplicado "Contacto" se retiró.
 
 // Ruta para obtener todas las categorías
 router.get("/categorias", asyncHandler(async (req, res) => {
