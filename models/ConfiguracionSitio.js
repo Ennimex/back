@@ -10,6 +10,16 @@ const ConfiguracionSitioSchema = new mongoose.Schema(
       default: "La Aterciopelada",
       trim: true,
     },
+    nombreCorto: {
+      type: String,
+      default: "La Aterciopelada",
+      trim: true,
+    },
+    lema: {
+      type: String,
+      default: "Boutique Huasteca",
+      trim: true,
+    },
     descripcion: {
       type: String,
       default: "",
@@ -36,6 +46,10 @@ const ConfiguracionSitioSchema = new mongoose.Schema(
       twitter: { type: String, default: "", trim: true },
       tiktok: { type: String, default: "", trim: true },
     },
+    // Textos legales que muestra la página /politicas. Los redacta la clienta
+    // desde el panel; borradores en docs/legales/.
+    terminosCondiciones: { type: String, default: "" },
+    avisoPrivacidad: { type: String, default: "" },
   },
   { timestamps: true }
 );

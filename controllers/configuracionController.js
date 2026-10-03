@@ -8,22 +8,23 @@ const asyncHandler = require("../utils/asyncHandler");
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Valores iniciales (siembra): el contenido que antes estaba "hardcoded" en el
-// frontend. Se usan solo al crear el documento por primera vez, para que el
-// panel de admin aparezca pre-cargado y listo para editar.
+// Valores iniciales (siembra). Solo se usan cuando el documento no existe o
+// está vacío. NUNCA pisan datos que la clienta ya capturó desde el panel.
+// Sin teléfono, correo ni WhatsApp inventados: esos los captura ella.
 const SEED_CONFIG = {
   nombre: "La Aterciopelada",
+  nombreCorto: "La Aterciopelada",
+  lema: "Boutique Huasteca",
   descripcion:
-    "Descubre la elegancia y calidad en cada prenda. Somos tu destino para la moda que refleja tu estilo único.",
-  direccion: "Región Huasteca, San Luis Potosí, México",
-  telefono: "+52 771 123 4567",
-  email: "info@laaterciopelada.com",
-  horarios: "Lunes a Viernes: 9:00 - 19:00, Sábados: 10:00 - 16:00",
+    "Atuendos huastecos de la región Huasteca de Hidalgo, hechos sobre pedido. Escríbenos por WhatsApp para cotizar.",
+  direccion: "Huejutla de Reyes, Hidalgo, México",
+  telefono: "",
+  email: "",
+  horarios: "",
   redesSociales: {
-    facebook:
-      "https://web.facebook.com/people/La-Aterciopelada/61567232369483/?sk=photos",
+    facebook: "https://web.facebook.com/people/La-Aterciopelada/61567232369483/",
     instagram: "",
-    whatsapp: "https://wa.me/527711234567",
+    whatsapp: "",
     twitter: "",
     tiktok: "",
   },
@@ -64,6 +65,8 @@ const getConfiguracion = asyncHandler(async (req, res) => {
   } else if (esConfigVacia(config)) {
     // Documento creado vacío antes de la siembra: rellenarlo una sola vez
     config.nombre = config.nombre || SEED_CONFIG.nombre;
+    config.nombreCorto = config.nombreCorto || SEED_CONFIG.nombreCorto;
+    config.lema = config.lema || SEED_CONFIG.lema;
     config.descripcion = SEED_CONFIG.descripcion;
     config.direccion = SEED_CONFIG.direccion;
     config.telefono = SEED_CONFIG.telefono;
@@ -82,7 +85,10 @@ const updateConfiguracion = asyncHandler(async (req, res) => {
     config = new ConfiguracionSitio({});
   }
 
-  const { nombre, descripcion, direccion, telefono, email, horarios } = req.body;
+  const {
+    nombre, nombreCorto, lema, descripcion, direccion, telefono, email, horarios,
+    terminosCondiciones, avisoPrivacidad,
+  } = req.body;
 
   if (nombre !== undefined) config.nombre = nombre;
   if (descripcion !== undefined) config.descripcion = descripcion;
@@ -90,6 +96,10 @@ const updateConfiguracion = asyncHandler(async (req, res) => {
   if (telefono !== undefined) config.telefono = telefono;
   if (email !== undefined) config.email = email;
   if (horarios !== undefined) config.horarios = horarios;
+  if (nombreCorto !== undefined) config.nombreCorto = nombreCorto;
+  if (lema !== undefined) config.lema = lema;
+  if (terminosCondiciones !== undefined) config.terminosCondiciones = terminosCondiciones;
+  if (avisoPrivacidad !== undefined) config.avisoPrivacidad = avisoPrivacidad;
 
   // Redes sociales: pueden venir como campos planos (redesSociales[facebook])
   // o como objeto/JSON. Soportamos ambos.
