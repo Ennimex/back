@@ -40,6 +40,8 @@ const valoresRoutes = require('./routes/valoresRoutes');
 const colaboradoresRoutes = require('./routes/colaboradoresRoutes');
 const favoritosRoutes = require('./routes/favoritosRoutes');
 const solicitudesRoutes = require('./routes/solicitudesRoutes');
+const preguntasRoutes = require("./routes/preguntasRoutes");
+const buzonRoutes = require("./routes/buzonRoutes");
 
 // Middleware de autenticación/autorización
 const { authenticate, isAdmin } = require("./middlewares/auth");
@@ -148,6 +150,10 @@ app.use("/api/colaboradores", colaboradoresRoutes);
 app.use("/api/favoritos", authenticate, favoritosRoutes);
 // Solicitudes de cotización (requiere usuario autenticado)
 app.use("/api/solicitudes", authenticate, solicitudesRoutes);
+// Preguntas frecuentes (GET público, CRUD admin)
+app.use("/api/preguntas-frecuentes", preguntasRoutes);
+// Buzón de quejas y sugerencias (POST público con límite, gestión admin)
+app.use("/api/buzon", buzonRoutes);
 
 // Ruta raíz (GET /)
 app.get("/", (req, res) => {
