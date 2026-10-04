@@ -1,12 +1,14 @@
 const Categoria = require("../models/Categorias");
 const Producto = require("../models/Producto");
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const multer = require("multer");
 const cloudinary = require("../config/cloudinaryConfig");
 const streamifier = require("streamifier");
 const asyncHandler = require("../utils/asyncHandler");
+const ApiError = require("../utils/ApiError");
+const { FILTRO_ACTIVOS } = require("../utils/filtroActivos");
 
-// Configurar almacenamiento de imágenes en memoria (para Cloudinary)
+// Multer en memoria: el archivo llega como buffer y se sube a Cloudinary
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
@@ -22,77 +24,90 @@ const subirImagen = (buffer, folder = "categorias") =>
 
 // Derivar el public_id de Cloudinary a partir de la URL guardada
 const publicIdDesdeUrl = (url) => {
-  const publicId = url.split('/').pop().split('.')[0];
-  return `categorias/${publicId}`;
+  const partesDeLaUrl = url.split("/");
+  return "categorias/" + partesDeLaUrl[partesDeLaUrl.length - 1].split(".")[0];
 };
 
-// Obtener todas las categorías (con el número de productos de cada una)
-const getCategorias = asyncHandler(async (req, res) => {
-  const categorias = await Categoria.find().lean();
+// Lista categorías según el filtro recibido y agrega a cada una cuántos
+// productos activos tiene (en una sola consulta de agregación).
+// Resultado: arreglo de categorías con `productosCount`.
+const listarCategoriasConConteo = async (filtroDeCategorias) => {
+  const categorias = await Categoria.find(filtroDeCategorias).lean();
 
-  // Contar productos agrupados por categoría en una sola consulta
-  const conteos = await Producto.aggregate([
-    { $match: { categoriaId: { $ne: null } } },
+  const conteosPorCategoria = await Producto.aggregate([
+    { $match: { categoriaId: { $ne: null }, ...FILTRO_ACTIVOS } },
     { $group: { _id: "$categoriaId", total: { $sum: 1 } } },
   ]);
-  const mapaConteo = {};
-  conteos.forEach((c) => { mapaConteo[String(c._id)] = c.total; });
+  const mapaDeConteos = {};
+  conteosPorCategoria.forEach((conteo) => {
+    mapaDeConteos[String(conteo._id)] = conteo.total;
+  });
 
-  const resultado = categorias.map((c) => ({
-    ...c,
-    productosCount: mapaConteo[String(c._id)] || 0,
+  return categorias.map((categoria) => ({
+    ...categoria,
+    productosCount: mapaDeConteos[String(categoria._id)] || 0,
   }));
+};
 
-  res.json(resultado);
+// Pública: solo categorías activas, con conteo de productos
+const getCategorias = asyncHandler(async (req, res) => {
+  const categoriasActivas = await listarCategoriasConConteo(FILTRO_ACTIVOS);
+  res.json(categoriasActivas);
 });
 
-// Crear nueva categoría (acepta imagen adjunta igual que updateCategoria)
+// Admin: todas las categorías, activas y desactivadas
+const getCategoriasAdmin = asyncHandler(async (req, res) => {
+  const todasLasCategorias = await listarCategoriasConConteo({});
+  res.json(todasLasCategorias);
+});
+
+// Crear una categoría (con imagen opcional)
 const createCategoria = asyncHandler(async (req, res) => {
   const duplicada = await Categoria.findOne({ nombre: req.body.nombre });
   if (duplicada) {
-    return res.status(400).json({ error: "Ya existe una categoría con ese nombre" });
+    throw new ApiError(400, "Ya existe una categoría con ese nombre");
   }
 
   let imagenURL = req.body.imagenURL || "";
   if (req.file) {
-    const result = await subirImagen(req.file.buffer);
-    imagenURL = result.secure_url;
+    const resultadoDeSubida = await subirImagen(req.file.buffer);
+    imagenURL = resultadoDeSubida.secure_url;
   }
 
   const nuevaCategoria = new Categoria({
     nombre: req.body.nombre,
     descripcion: req.body.descripcion,
-    imagenURL
+    imagenURL,
   });
 
   const categoriaGuardada = await nuevaCategoria.save();
   res.status(201).json({
     mensaje: "Categoría creada correctamente",
-    categoria: categoriaGuardada
+    categoria: categoriaGuardada,
   });
 });
 
-// Actualizar una categoría
+// Actualizar una categoría (nombre, descripción e imagen opcional)
 const updateCategoria = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "ID de categoría inválido" });
+    throw new ApiError(400, "ID de categoría inválido");
   }
 
   const categoriaExistente = await Categoria.findById(id);
   if (!categoriaExistente) {
-    return res.status(404).json({ mensaje: "Categoría no encontrada" });
+    throw new ApiError(404, "Categoría no encontrada");
   }
 
-  const updateData = {
+  const datosActualizados = {
     nombre: req.body.nombre,
-    descripcion: req.body.descripcion
+    descripcion: req.body.descripcion,
   };
 
   // Si viene una nueva imagen, subirla y borrar la anterior
   if (req.file) {
-    const result = await subirImagen(req.file.buffer);
+    const resultadoDeSubida = await subirImagen(req.file.buffer);
 
     if (categoriaExistente.imagenURL) {
       try {
@@ -102,59 +117,72 @@ const updateCategoria = asyncHandler(async (req, res) => {
       }
     }
 
-    updateData.imagenURL = result.secure_url;
+    datosActualizados.imagenURL = resultadoDeSubida.secure_url;
   }
 
-  const categoriaActualizada = await Categoria.findByIdAndUpdate(
-    id,
-    updateData,
-    { new: true, runValidators: true }
-  );
+  const categoriaActualizada = await Categoria.findByIdAndUpdate(id, datosActualizados, {
+    new: true,
+    runValidators: true,
+  });
 
   res.json({
     mensaje: "Categoría actualizada correctamente",
-    categoria: categoriaActualizada
+    categoria: categoriaActualizada,
   });
 });
 
-// Eliminar una categoría
-const deleteCategoria = asyncHandler(async (req, res) => {
+// "Eliminar" una categoría = desactivarla (borrado lógico). Los productos
+// conservan su categoriaId (antes se les ponía en null) y la imagen se
+// conserva en Cloudinary porque la categoría se puede reactivar.
+const desactivarCategoria = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ error: "ID de categoría inválido" });
+    throw new ApiError(400, "ID de categoría inválido");
   }
 
-  const categoria = await Categoria.findById(id);
-  if (!categoria) {
-    return res.status(404).json({ mensaje: "Categoría no encontrada" });
+  const categoriaDesactivada = await Categoria.findByIdAndUpdate(id, { activo: false }, { new: true });
+  if (!categoriaDesactivada) {
+    throw new ApiError(404, "Categoría no encontrada");
   }
 
-  // Eliminar imagen de Cloudinary si existe
-  if (categoria.imagenURL) {
-    try {
-      await cloudinary.uploader.destroy(publicIdDesdeUrl(categoria.imagenURL));
-    } catch (cloudinaryError) {
-      console.error("Error al eliminar imagen de Cloudinary:", cloudinaryError.message);
-    }
-  }
-
-  await Categoria.findByIdAndDelete(id);
-
-  // Desvincular los productos que apuntaban a esta categoría (evita referencias colgantes)
-  await Producto.updateMany({ categoriaId: id }, { $set: { categoriaId: null } });
+  // Se informa cuántos productos activos la siguen usando, para que el admin
+  // decida si también los desactiva o los cambia de categoría
+  const productosActivosConEstaCategoria = await Producto.countDocuments({ categoriaId: id, ...FILTRO_ACTIVOS });
 
   res.json({
-    mensaje: "Categoría eliminada correctamente",
-    categoriaEliminada: categoria
+    mensaje: "Categoría desactivada correctamente",
+    categoria: categoriaDesactivada,
+    productosActivos: productosActivosConEstaCategoria,
+  });
+});
+
+// Reactivar una categoría desactivada
+const reactivarCategoria = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, "ID de categoría inválido");
+  }
+
+  const categoriaReactivada = await Categoria.findByIdAndUpdate(id, { activo: true }, { new: true });
+  if (!categoriaReactivada) {
+    throw new ApiError(404, "Categoría no encontrada");
+  }
+
+  res.json({
+    mensaje: "Categoría reactivada correctamente",
+    categoria: categoriaReactivada,
   });
 });
 
 // Exportar controladores
 module.exports = {
   getCategorias,
+  getCategoriasAdmin,
   createCategoria,
   updateCategoria,
-  deleteCategoria,
-  upload
+  desactivarCategoria,
+  reactivarCategoria,
+  upload,
 };

@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const asyncHandler = require('../utils/asyncHandler');
+// Los listados públicos del catálogo solo muestran registros activos
+const { FILTRO_ACTIVOS } = require('../utils/filtroActivos');
 
 // Importar los modelos
 const Nosotros = require('../models/Nosotros');
@@ -32,19 +34,19 @@ router.get('/servicios/:id', getServicioById);
 
 // Obtener todas las localidades
 router.get('/localidades', asyncHandler(async (req, res) => {
-  const localidades = await Localidad.find();
+  const localidades = await Localidad.find(FILTRO_ACTIVOS);
   res.json(localidades);
 }));
 
 // Ruta pública para obtener todas las tallas con su categoría
 router.get('/tallas', asyncHandler(async (req, res) => {
-  const tallas = await Tallas.find().populate('categoriaId');
+  const tallas = await Tallas.find(FILTRO_ACTIVOS).populate('categoriaId');
   res.json(tallas);
 }));
 
 // Ruta pública para obtener todas las categorías
 router.get('/categorias', asyncHandler(async (req, res) => {
-  const categorias = await Categorias.find();
+  const categorias = await Categorias.find(FILTRO_ACTIVOS);
   res.json(categorias);
 }));
 
@@ -64,7 +66,7 @@ router.get('/contacto', asyncHandler(async (req, res) => {
 
 // Ruta pública para obtener todos los productos con sus relaciones
 router.get('/productos', asyncHandler(async (req, res) => {
-  const productos = await Producto.find()
+  const productos = await Producto.find(FILTRO_ACTIVOS)
     .populate('localidadId')
     .populate({ path: 'categoriaId', select: 'nombre' })
     .populate({
@@ -78,7 +80,8 @@ router.get('/productos', asyncHandler(async (req, res) => {
 
 // Ruta pública para obtener el detalle de un producto por su ID
 router.get('/productos/:id', asyncHandler(async (req, res) => {
-  const producto = await Producto.findById(req.params.id)
+  // Un producto desactivado responde 404 en el sitio público
+  const producto = await Producto.findOne({ _id: req.params.id, ...FILTRO_ACTIVOS })
     .populate('localidadId')
     .populate({ path: 'categoriaId', select: 'nombre' })
     .populate({

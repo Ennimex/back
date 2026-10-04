@@ -19,7 +19,11 @@ const ProductoSchema = new mongoose.Schema({
   tallasDisponibles: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Tallas'
-  }]
+  }],
+  // Borrado lógico: el admin "elimina" poniendo activo en false. El producto
+  // deja de aparecer en el sitio pero sigue existiendo para las solicitudes
+  // y favoritos que lo referencian, y se puede reactivar.
+  activo: { type: Boolean, default: true, index: true }
 });
 
 // Índices

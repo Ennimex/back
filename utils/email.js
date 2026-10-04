@@ -113,8 +113,14 @@ const sendSolicitudEmail = async (to, { nombre, email, telefono, mensaje, produc
   if (!fromEmail) throw new Error("BREVO_FROM_EMAIL no está configurada");
 
   const esc = (s) => String(s || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // Cada renglón muestra el nombre copiado al pedir (o el campo viejo `nombre`)
+  // y la cantidad cuando es mayor a una pieza.
   const items = (productos || [])
-    .map((p) => `<li style="margin-bottom:4px;">${esc(p.nombre) || "Producto"}</li>`)
+    .map((renglon) => {
+      const nombreDelProducto = esc(renglon.nombreAlPedir || renglon.nombre) || "Producto";
+      const cantidadPedida = Number(renglon.cantidad) > 1 ? ` x ${Number(renglon.cantidad)}` : "";
+      return `<li style="margin-bottom:4px;">${nombreDelProducto}${cantidadPedida}</li>`;
+    })
     .join("");
 
   const html = `

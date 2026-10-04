@@ -1,14 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const { getTallas, createTalla, updateTalla, deleteTalla } = require('../controllers/tallasController');
-const { authenticate, isAdmin } = require("../middlewares/auth");
+const {
+  getTallas,
+  getTallasAdmin,
+  createTalla,
+  updateTalla,
+  desactivarTalla,
+  reactivarTalla,
+} = require('../controllers/tallasController');
+const { authenticate, isAdmin } = require('../middlewares/auth');
 
-// Ruta pública para obtener todas las tallas
+// Pública: solo tallas activas
 router.get('/', getTallas);
 
-// Rutas protegidas (solo admin)
+// Admin: todas las tallas, incluidas las desactivadas
+router.get('/todos', authenticate, isAdmin, getTallasAdmin);
+
+// Admin: alta y edición
 router.post('/', authenticate, isAdmin, createTalla);
 router.put('/:id', authenticate, isAdmin, updateTalla);
-router.delete('/:id', authenticate, isAdmin, deleteTalla);
+
+// Admin: "eliminar" desactiva (borrado lógico) y reactivar la devuelve al sitio
+router.delete('/:id', authenticate, isAdmin, desactivarTalla);
+router.patch('/:id/reactivar', authenticate, isAdmin, reactivarTalla);
 
 module.exports = router;

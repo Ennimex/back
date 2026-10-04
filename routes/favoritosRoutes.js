@@ -4,14 +4,18 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const asyncHandler = require('../utils/asyncHandler');
+const { FILTRO_ACTIVOS } = require('../utils/filtroActivos');
 
 // Estas rutas se montan en index.js detrás de `authenticate`, por lo que
 // req.user.id siempre está disponible aquí.
 
 // GET /api/favoritos — lista los productos favoritos del usuario (poblados)
 router.get('/', asyncHandler(async (req, res) => {
+  // Solo se pueblan los productos activos: un favorito desactivado queda
+  // como null y se filtra abajo (la referencia se conserva por si se reactiva)
   const user = await User.findById(req.user.id).populate({
     path: 'favoritos',
+    match: FILTRO_ACTIVOS,
     populate: [
       { path: 'localidadId', select: 'nombre' },
       { path: 'tallasDisponibles', populate: { path: 'categoriaId' } },

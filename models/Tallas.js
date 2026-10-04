@@ -9,7 +9,10 @@ const TallaSchema = new mongoose.Schema({
   genero: { type: String, required: true },
   talla: { type: String, required: true },
   rangoEdad: String,
-  medida: String
+  medida: String,
+  // Borrado lógico: desactivada no aparece en el sitio, pero los productos
+  // y solicitudes que la referencian la conservan y se puede reactivar.
+  activo: { type: Boolean, default: true, index: true }
 });
 
 // Índices

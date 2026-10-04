@@ -1,20 +1,28 @@
 const express = require('express');
 const router = express.Router();
-const { 
-    getCategorias, 
-    createCategoria, 
-    updateCategoria, 
-    deleteCategoria, 
-    upload 
+const {
+  getCategorias,
+  getCategoriasAdmin,
+  createCategoria,
+  updateCategoria,
+  desactivarCategoria,
+  reactivarCategoria,
+  upload,
 } = require('../controllers/categoriasController');
-const { authenticate, isAdmin } = require("../middlewares/auth");
+const { authenticate, isAdmin } = require('../middlewares/auth');
 
-// Ruta pública para obtener todas las categorías
+// Pública: solo categorías activas
 router.get('/', getCategorias);
 
-// Rutas protegidas (solo admin)
+// Admin: todas las categorías, incluidas las desactivadas
+router.get('/todos', authenticate, isAdmin, getCategoriasAdmin);
+
+// Admin: alta y edición (con imagen opcional en el campo 'imagen')
 router.post('/', authenticate, isAdmin, upload.single('imagen'), createCategoria);
 router.put('/:id', authenticate, isAdmin, upload.single('imagen'), updateCategoria);
-router.delete('/:id', authenticate, isAdmin, deleteCategoria);
+
+// Admin: "eliminar" desactiva (borrado lógico) y reactivar la devuelve al sitio
+router.delete('/:id', authenticate, isAdmin, desactivarCategoria);
+router.patch('/:id/reactivar', authenticate, isAdmin, reactivarCategoria);
 
 module.exports = router;

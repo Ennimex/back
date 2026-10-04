@@ -15,6 +15,8 @@ const Servicio = require('../models/Servicio');
 const Colaborador = require('../models/Colaboradores');
 const Solicitud = require('../models/Solicitud');
 const ApiError = require('../utils/ApiError');
+const { FILTRO_ACTIVOS } = require('../utils/filtroActivos');
+const { listarTodasLasSolicitudes, cambiarEstadoSolicitud } = require('../controllers/solicitudesController');
 
 // Middleware para todas las rutas de admin
 router.use(authenticate, checkRole(['admin']));
@@ -57,10 +59,11 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
   const [usuarios, productos, categorias, localidades, tallas, eventos, fotos, videos, servicios, colaboradores, solicitudes, solicitudesPendientes] =
     await Promise.all([
       User.countDocuments(),
-      Producto.countDocuments(),
-      Categoria.countDocuments(),
-      Localidad.countDocuments(),
-      Talla.countDocuments(),
+      // Del catálogo se cuentan solo los activos (lo que ve el sitio)
+      Producto.countDocuments(FILTRO_ACTIVOS),
+      Categoria.countDocuments(FILTRO_ACTIVOS),
+      Localidad.countDocuments(FILTRO_ACTIVOS),
+      Talla.countDocuments(FILTRO_ACTIVOS),
       Evento.countDocuments(),
       Foto.countDocuments(),
       Video.countDocuments(),
@@ -79,7 +82,8 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
       User.find({}, 'name email role createdAt').sort({ createdAt: -1 }).limit(5).lean(),
       Producto.find({}, 'nombre createdAt').sort({ _id: -1 }).limit(3).lean(),
       Categoria.find({}, 'nombre createdAt').sort({ _id: -1 }).limit(2).lean(),
-      Solicitud.find({}, 'nombre estado productos createdAt').sort({ _id: -1 }).limit(4).lean(),
+      // Sin .lean() para que los renglones incluyan los virtuales de compatibilidad (nombre, imagenURL)
+      Solicitud.find({}, 'nombre estado productos createdAt').sort({ _id: -1 }).limit(4),
     ]);
   const fechas = users.map((u) => u.createdAt).filter(Boolean).map((d) => new Date(d));
 
@@ -199,39 +203,9 @@ router.post('/users', asyncHandler(async (req, res) => {
 }));
 
 // --- Solicitudes de cotización (vista del administrador) ---
-
-// Listar todas las solicitudes (más recientes primero).
-// Los datos de contacto y de los productos ya son un "snapshot" guardado en
-// la propia solicitud, así que no hace falta poblar referencias.
-router.get('/solicitudes', asyncHandler(async (req, res) => {
-  const solicitudes = await Solicitud.find({}).sort({ createdAt: -1 });
-  res.json(solicitudes);
-}));
-
-// Cambiar el estado de una solicitud (pendiente / atendida / cerrada)
-const ESTADOS_SOLICITUD = ['pendiente', 'atendida', 'cerrada'];
-router.patch('/solicitudes/:id', asyncHandler(async (req, res) => {
-  const { estado } = req.body;
-
-  if (!ESTADOS_SOLICITUD.includes(estado)) {
-    throw new ApiError(400, 'Estado inválido. Usa pendiente, atendida o cerrada.');
-  }
-
-  const solicitud = await Solicitud.findByIdAndUpdate(
-    req.params.id,
-    { estado },
-    { new: true, runValidators: true }
-  );
-
-  if (!solicitud) {
-    throw new ApiError(404, 'Solicitud no encontrada');
-  }
-
-  res.json({
-    success: true,
-    data: solicitud,
-    message: 'Estado de la solicitud actualizado',
-  });
-}));
+// La lógica (listado completo y cambio de estado con historial) vive en
+// controllers/solicitudesController.js; aquí solo se conectan las rutas.
+router.get('/solicitudes', listarTodasLasSolicitudes);
+router.patch('/solicitudes/:id', cambiarEstadoSolicitud);
 
 module.exports = router;
