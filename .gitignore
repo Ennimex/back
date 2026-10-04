@@ -76,3 +76,6 @@ cloudinary-temp/
 # Archivos de JWT tokens temporales
 tokens/
 jwt-temp/
+# Respaldos de la base (datos personales): viven fuera del repo, en ../respaldos-aterciopelada/
+respaldos-aterciopelada/
+respaldos/

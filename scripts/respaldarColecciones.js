@@ -2,9 +2,14 @@
 // Usa el formato EJSON (relajado) para que ObjectId y fechas se conserven y se
 // puedan restaurar con mongoimport si hiciera falta.
 //
+// Los respaldos contienen datos personales (correos, hashes, tokens), por eso
+// se escriben FUERA del repositorio: en ../respaldos-aterciopelada/<fecha>/,
+// carpeta que además está en .gitignore.
+//
 // Uso (con MONGODB_URI en back/.env o en el entorno):
-//   node scripts/respaldarColecciones.js <carpetaDestino> [coleccion1 coleccion2 ...]
-// Sin lista de colecciones, respalda todas las de la base.
+//   node scripts/respaldarColecciones.js                      → todas las colecciones, destino por defecto
+//   node scripts/respaldarColecciones.js --destino <carpeta>  → otra carpeta
+//   node scripts/respaldarColecciones.js productos fotos      → solo esas colecciones
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
@@ -12,10 +17,18 @@ const mongoose = require('mongoose');
 // EJSON viene con el driver de MongoDB que mongoose ya incluye
 const { EJSON } = mongoose.mongo.BSON;
 
-const [carpetaDestino, ...coleccionesPedidas] = process.argv.slice(2);
+// Carpeta por defecto: fuera del repo, con la fecha y hora de la corrida
+const marcaDeTiempo = new Date().toISOString().slice(0, 16).replace('T', '-').replace(':', '');
+const carpetaPorDefecto = path.resolve(__dirname, '..', '..', 'respaldos-aterciopelada', marcaDeTiempo);
 
-if (!carpetaDestino) {
-  console.error('Uso: node scripts/respaldarColecciones.js <carpetaDestino> [colecciones...]');
+// Argumentos: --destino <carpeta> opcional y, el resto, nombres de colección
+const argumentos = process.argv.slice(2);
+const posicionDestino = argumentos.indexOf('--destino');
+const carpetaDestino = posicionDestino >= 0 ? argumentos[posicionDestino + 1] : carpetaPorDefecto;
+const coleccionesPedidas = argumentos.filter((arg, i) => arg !== '--destino' && i !== posicionDestino + 1);
+
+if (posicionDestino >= 0 && !carpetaDestino) {
+  console.error('Uso: node scripts/respaldarColecciones.js [--destino <carpeta>] [colecciones...]');
   process.exit(1);
 }
 
