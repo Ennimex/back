@@ -24,8 +24,11 @@ const normalizarCantidad = (valorRecibido) => {
   return cantidadEntera;
 };
 
-// Valida la talla elegida para un producto: debe tener formato válido, existir
-// y, si el producto tiene tallas definidas, ser una de ellas.
+// Valida la talla elegida para un producto. Para aceptarse debe:
+//   1. tener formato de id válido,
+//   2. estar en `tallasDisponibles` del producto (si el producto no maneja
+//      tallas, no se acepta ninguna),
+//   3. existir y estar activa.
 // Resultado: el id de la talla, o null si el renglón no trae talla.
 const validarTallaElegida = async (tallaRecibida, productoReal) => {
   if (!tallaRecibida) {
@@ -35,16 +38,23 @@ const validarTallaElegida = async (tallaRecibida, productoReal) => {
     throw new ApiError(400, 'La talla elegida tiene un identificador inválido');
   }
 
+  // 2) La talla debe ser una de las que ofrece el producto
   const tallasDelProducto = (productoReal.tallasDisponibles || []).map(String);
-  const productoDefineTallas = tallasDelProducto.length > 0;
+  if (tallasDelProducto.length === 0) {
+    throw new ApiError(400, `${productoReal.nombre} no maneja tallas; envía el renglón sin talla`);
+  }
   const tallaPerteneceAlProducto = tallasDelProducto.includes(String(tallaRecibida));
-  if (productoDefineTallas && !tallaPerteneceAlProducto) {
+  if (!tallaPerteneceAlProducto) {
     throw new ApiError(400, `La talla elegida no está disponible para ${productoReal.nombre}`);
   }
 
-  const tallaExiste = await Talla.exists({ _id: tallaRecibida });
-  if (!tallaExiste) {
+  // 3) La talla debe existir y seguir activa
+  const tallaEnBase = await Talla.findById(tallaRecibida).select('activo').lean();
+  if (!tallaEnBase) {
     throw new ApiError(400, 'La talla elegida no existe');
+  }
+  if (tallaEnBase.activo === false) {
+    throw new ApiError(400, `La talla elegida para ${productoReal.nombre} está desactivada`);
   }
   return tallaRecibida;
 };

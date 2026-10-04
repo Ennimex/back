@@ -115,6 +115,34 @@ describe("solicitudes de cotización", () => {
     expect(res.body.error).toMatch(/talla elegida no está disponible/);
   });
 
+  it("rechaza una talla desactivada aunque el producto la liste", async () => {
+    const { producto, talla } = await crearCatalogoBasico();
+    const { token } = await crearUsuarioConToken("user", "cliente@pruebas.com");
+    await Talla.findByIdAndUpdate(talla._id, { activo: false });
+
+    const res = await request(app)
+      .post("/api/solicitudes")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ productos: [{ productoId: producto._id, tallaElegida: talla._id }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/está desactivada/);
+  });
+
+  it("rechaza cualquier talla cuando el producto no maneja tallas", async () => {
+    const { localidad, talla } = await crearCatalogoBasico();
+    const productoSinTallas = await Producto.create({ nombre: "Rebozo", localidadId: localidad._id });
+    const { token } = await crearUsuarioConToken("user", "cliente@pruebas.com");
+
+    const res = await request(app)
+      .post("/api/solicitudes")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ productos: [{ productoId: productoSinTallas._id, tallaElegida: talla._id }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/no maneja tallas/);
+  });
+
   it("el admin cambia el estado y queda en el historial con su id; repetirlo no duplica", async () => {
     const { producto } = await crearCatalogoBasico();
     const { usuario: cliente } = await crearUsuarioConToken("user", "cliente@pruebas.com");

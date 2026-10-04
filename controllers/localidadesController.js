@@ -1,9 +1,12 @@
 const Localidad = require('../models/Localidades');
-const Producto = require('../models/Producto');
 const mongoose = require('mongoose');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { FILTRO_ACTIVOS } = require('../utils/filtroActivos');
+const {
+  buscarProductosActivosQueReferencian,
+  responderConflictoPorProductos,
+} = require('../utils/bloqueoPorReferencias');
 
 // Pública: solo localidades activas
 const getLocalidades = asyncHandler(async (req, res) => {
@@ -72,11 +75,24 @@ const updateLocalidad = asyncHandler(async (req, res) => {
   res.json(localidadActualizada);
 });
 
-// "Eliminar" una localidad = desactivarla (borrado lógico). Los productos
-// conservan su localidadId y la localidad se puede reactivar.
+// "Eliminar" una localidad = desactivarla (borrado lógico). Solo se permite
+// cuando ningún producto activo la usa; los productos desactivados conservan
+// su localidadId y la localidad se puede reactivar.
 const desactivarLocalidad = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
     throw new ApiError(400, 'ID de localidad inválido');
+  }
+
+  const localidadExistente = await Localidad.findById(req.params.id);
+  if (!localidadExistente) {
+    throw new ApiError(404, 'Localidad no encontrada');
+  }
+
+  // Si hay productos activos que la usan, no se desactiva (409): el admin
+  // debe desactivarlos o cambiarlos de localidad primero
+  const referenciasActivas = await buscarProductosActivosQueReferencian({ localidadId: req.params.id });
+  if (referenciasActivas.total > 0) {
+    return responderConflictoPorProductos(res, 'localidad', referenciasActivas);
   }
 
   const localidadDesactivada = await Localidad.findByIdAndUpdate(
@@ -84,20 +100,10 @@ const desactivarLocalidad = asyncHandler(async (req, res) => {
     { activo: false },
     { new: true }
   );
-  if (!localidadDesactivada) {
-    throw new ApiError(404, 'Localidad no encontrada');
-  }
-
-  // Cuántos productos activos siguen apuntando a esta localidad
-  const productosActivosConEstaLocalidad = await Producto.countDocuments({
-    localidadId: req.params.id,
-    ...FILTRO_ACTIVOS,
-  });
 
   res.json({
     mensaje: 'Localidad desactivada correctamente',
     localidad: localidadDesactivada,
-    productosActivos: productosActivosConEstaLocalidad,
   });
 });
 

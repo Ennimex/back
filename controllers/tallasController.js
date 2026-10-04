@@ -1,10 +1,13 @@
 const Talla = require("../models/Tallas");
 const Categoria = require("../models/Categorias");
-const Producto = require("../models/Producto");
 const mongoose = require("mongoose");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { FILTRO_ACTIVOS } = require("../utils/filtroActivos");
+const {
+  buscarProductosActivosQueReferencian,
+  responderConflictoPorProductos,
+} = require("../utils/bloqueoPorReferencias");
 
 // Verifica que la categoría de la talla exista. Lanza 400 si no.
 const verificarCategoriaDeLaTalla = async (categoriaId) => {
@@ -77,8 +80,9 @@ const updateTalla = asyncHandler(async (req, res) => {
   });
 });
 
-// "Eliminar" una talla = desactivarla (borrado lógico). Los productos y las
-// solicitudes que la referencian la conservan y se puede reactivar.
+// "Eliminar" una talla = desactivarla (borrado lógico). Solo se permite
+// cuando ningún producto activo la ofrece; las solicitudes antiguas que la
+// referencian la conservan y la talla se puede reactivar.
 const desactivarTalla = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -86,21 +90,23 @@ const desactivarTalla = asyncHandler(async (req, res) => {
     throw new ApiError(400, "ID de talla inválido");
   }
 
-  const tallaDesactivada = await Talla.findByIdAndUpdate(id, { activo: false }, { new: true });
-  if (!tallaDesactivada) {
+  const tallaExistente = await Talla.findById(id);
+  if (!tallaExistente) {
     throw new ApiError(404, "Talla no encontrada");
   }
 
-  // Cuántos productos activos siguen ofreciendo esta talla
-  const productosActivosConEstaTalla = await Producto.countDocuments({
-    tallasDisponibles: id,
-    ...FILTRO_ACTIVOS,
-  });
+  // Si hay productos activos que la ofrecen, no se desactiva (409): el admin
+  // debe quitarles la talla o desactivarlos primero
+  const referenciasActivas = await buscarProductosActivosQueReferencian({ tallasDisponibles: id });
+  if (referenciasActivas.total > 0) {
+    return responderConflictoPorProductos(res, "talla", referenciasActivas);
+  }
+
+  const tallaDesactivada = await Talla.findByIdAndUpdate(id, { activo: false }, { new: true });
 
   res.json({
     mensaje: "Talla desactivada correctamente",
     talla: tallaDesactivada,
-    productosActivos: productosActivosConEstaTalla,
   });
 });
 

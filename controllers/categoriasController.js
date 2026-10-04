@@ -7,6 +7,10 @@ const streamifier = require("streamifier");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { FILTRO_ACTIVOS } = require("../utils/filtroActivos");
+const {
+  buscarProductosActivosQueReferencian,
+  responderConflictoPorProductos,
+} = require("../utils/bloqueoPorReferencias");
 
 // Multer en memoria: el archivo llega como buffer y se sube a Cloudinary
 const storage = multer.memoryStorage();
@@ -131,9 +135,9 @@ const updateCategoria = asyncHandler(async (req, res) => {
   });
 });
 
-// "Eliminar" una categoría = desactivarla (borrado lógico). Los productos
-// conservan su categoriaId (antes se les ponía en null) y la imagen se
-// conserva en Cloudinary porque la categoría se puede reactivar.
+// "Eliminar" una categoría = desactivarla (borrado lógico). Solo se permite
+// cuando ningún producto activo la usa; los productos desactivados conservan
+// su categoriaId y la imagen se queda en Cloudinary porque se puede reactivar.
 const desactivarCategoria = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -141,19 +145,23 @@ const desactivarCategoria = asyncHandler(async (req, res) => {
     throw new ApiError(400, "ID de categoría inválido");
   }
 
-  const categoriaDesactivada = await Categoria.findByIdAndUpdate(id, { activo: false }, { new: true });
-  if (!categoriaDesactivada) {
+  const categoriaExistente = await Categoria.findById(id);
+  if (!categoriaExistente) {
     throw new ApiError(404, "Categoría no encontrada");
   }
 
-  // Se informa cuántos productos activos la siguen usando, para que el admin
-  // decida si también los desactiva o los cambia de categoría
-  const productosActivosConEstaCategoria = await Producto.countDocuments({ categoriaId: id, ...FILTRO_ACTIVOS });
+  // Si hay productos activos que la usan, no se desactiva (409): el admin
+  // debe desactivarlos o cambiarlos de categoría primero
+  const referenciasActivas = await buscarProductosActivosQueReferencian({ categoriaId: id });
+  if (referenciasActivas.total > 0) {
+    return responderConflictoPorProductos(res, "categoría", referenciasActivas);
+  }
+
+  const categoriaDesactivada = await Categoria.findByIdAndUpdate(id, { activo: false }, { new: true });
 
   res.json({
     mensaje: "Categoría desactivada correctamente",
     categoria: categoriaDesactivada,
-    productosActivos: productosActivosConEstaCategoria,
   });
 });
 

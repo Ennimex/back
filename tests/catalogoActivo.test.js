@@ -76,11 +76,44 @@ describe("borrado lógico del catálogo", () => {
     expect(resUsuario.status).toBe(403);
   });
 
-  it("categoría, localidad y talla desactivadas no salen en los GET públicos", async () => {
-    const { localidad, categoria, talla } = await crearCatalogoBasico();
+  it("no desactiva categoría, localidad ni talla mientras un producto activo las use (409 con conteo y lista)", async () => {
+    const { localidad, categoria, talla, producto } = await crearCatalogoBasico();
     const { token } = await crearUsuarioConToken("admin", "admin@pruebas.com");
     const autorizacion = ["Authorization", `Bearer ${token}`];
 
+    const resCategoria = await request(app).delete(`/api/categorias/${categoria._id}`).set(...autorizacion);
+    expect(resCategoria.status).toBe(409);
+    expect(resCategoria.body.productosActivos).toBe(1);
+    expect(resCategoria.body.productos).toEqual([{ _id: String(producto._id), nombre: "Blusa bordada" }]);
+    expect(resCategoria.body.error).toMatch(/No se puede desactivar/);
+
+    const resLocalidad = await request(app).delete(`/api/localidades/${localidad._id}`).set(...autorizacion);
+    expect(resLocalidad.status).toBe(409);
+    expect(resLocalidad.body.productosActivos).toBe(1);
+
+    const resTalla = await request(app).delete(`/api/tallas/${talla._id}`).set(...autorizacion);
+    expect(resTalla.status).toBe(409);
+    expect(resTalla.body.productos[0].nombre).toBe("Blusa bordada");
+
+    // Nada cambió en la base
+    expect((await Categoria.findById(categoria._id)).activo).toBe(true);
+    expect((await Localidad.findById(localidad._id)).activo).toBe(true);
+    expect((await Talla.findById(talla._id)).activo).toBe(true);
+
+    // Al desactivar el producto, las tres ya se pueden desactivar
+    await request(app).delete(`/api/productos/${producto._id}`).set(...autorizacion).expect(200);
+    await request(app).delete(`/api/categorias/${categoria._id}`).set(...autorizacion).expect(200);
+    await request(app).delete(`/api/localidades/${localidad._id}`).set(...autorizacion).expect(200);
+    await request(app).delete(`/api/tallas/${talla._id}`).set(...autorizacion).expect(200);
+  });
+
+  it("categoría, localidad y talla desactivadas no salen en los GET públicos", async () => {
+    const { localidad, categoria, talla, producto } = await crearCatalogoBasico();
+    const { token } = await crearUsuarioConToken("admin", "admin@pruebas.com");
+    const autorizacion = ["Authorization", `Bearer ${token}`];
+
+    // Primero se desactiva el producto que las referencia
+    await request(app).delete(`/api/productos/${producto._id}`).set(...autorizacion).expect(200);
     await request(app).delete(`/api/categorias/${categoria._id}`).set(...autorizacion).expect(200);
     await request(app).delete(`/api/localidades/${localidad._id}`).set(...autorizacion).expect(200);
     await request(app).delete(`/api/tallas/${talla._id}`).set(...autorizacion).expect(200);
@@ -97,10 +130,10 @@ describe("borrado lógico del catálogo", () => {
     expect((await request(app).get("/api/localidades/todos").set(...autorizacion)).body).toHaveLength(1);
     expect((await request(app).get("/api/tallas/todos").set(...autorizacion)).body).toHaveLength(1);
 
-    // Los productos conservan sus referencias (no se ponen en null)
-    const producto = await Producto.findOne();
-    expect(String(producto.categoriaId)).toBe(String(categoria._id));
-    expect(String(producto.localidadId)).toBe(String(localidad._id));
+    // El producto desactivado conserva sus referencias (no se ponen en null)
+    const productoEnBase = await Producto.findById(producto._id);
+    expect(String(productoEnBase.categoriaId)).toBe(String(categoria._id));
+    expect(String(productoEnBase.localidadId)).toBe(String(localidad._id));
   });
 
   it("los documentos antiguos sin campo activo siguen apareciendo como activos", async () => {
