@@ -10,9 +10,10 @@ const VideoSchema = new mongoose.Schema(
     descripcion: String,
     duracion: Number, // Duración en segundos
     formato: String, // Formato del video (mp4, mov, etc.)
-    // Miniatura: imagen derivada del propio video por Cloudinary. Sigue el
-    // mismo patrón { url, publicId }; su publicId es el del video, porque es
-    // una transformación de él y se borra junto con el archivo.
+    // Miniatura con el mismo patrón { url, publicId }. Normalmente es una
+    // transformación del propio video (entonces su publicId es el del video y
+    // no hay archivo aparte). Si fuera una imagen subida por separado, lleva
+    // su propio publicId y se borra junto con el video.
     miniatura: { type: EsquemaImagen, default: () => ({}) },
     // Evento al que pertenece el video (opcional)
     eventoId: {

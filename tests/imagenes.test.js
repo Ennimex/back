@@ -34,6 +34,7 @@ const User = require("../models/User");
 const Foto = require("../models/Fotos");
 const Servicio = require("../models/Servicio");
 const Categoria = require("../models/Categorias");
+const Video = require("../models/Video");
 const { extraerPublicIdDeUrl } = require("../utils/imagenesCloudinary");
 
 // Crea un admin y devuelve su token
@@ -154,6 +155,52 @@ describe("imágenes en Cloudinary (API con Cloudinary simulado)", () => {
     await request(app).delete(`/api/servicios/${servicioSinImagen._id}`).set("Authorization", `Bearer ${token}`).expect(200);
 
     expect(mockDestroy).not.toHaveBeenCalled();
+  });
+
+  it("DELETE /api/videos/:id borra el video y, solo si la miniatura es un archivo aparte, también ella", async () => {
+    const token = await tokenAdmin();
+    const autorizacion = ["Authorization", `Bearer ${token}`];
+    const videoConPortadaPropia = await Video.create({
+      titulo: "Con portada propia",
+      url: "https://res.cloudinary.com/demo/video/upload/v1/galeria/videos/a.mp4",
+      publicId: "galeria/videos/a",
+      miniatura: { url: "https://res.cloudinary.com/demo/image/upload/v1/galeria/miniaturas/a.jpg", publicId: "galeria/miniaturas/a" },
+    });
+    const videoConMiniaturaDerivada = await Video.create({
+      titulo: "Derivado",
+      url: "https://res.cloudinary.com/demo/video/upload/v1/galeria/videos/b.mp4",
+      publicId: "galeria/videos/b",
+      miniatura: { url: "https://res.cloudinary.com/demo/video/upload/so_0/galeria/videos/b.jpg", publicId: "galeria/videos/b" },
+    });
+
+    // Portada propia: se borran los dos archivos
+    const resPortadaPropia = await request(app).delete(`/api/videos/${videoConPortadaPropia._id}`).set(...autorizacion);
+    expect(resPortadaPropia.status).toBe(200);
+    expect(resPortadaPropia.body.videoEliminado).toMatchObject({ archivoEliminado: true, miniaturaEliminada: true });
+    expect(mockDestroy).toHaveBeenCalledWith("galeria/videos/a", { resource_type: "video" });
+    expect(mockDestroy).toHaveBeenCalledWith("galeria/miniaturas/a", { resource_type: "image" });
+
+    // Miniatura derivada: solo se borra el video
+    mockDestroy.mockClear();
+    const resDerivado = await request(app).delete(`/api/videos/${videoConMiniaturaDerivada._id}`).set(...autorizacion);
+    expect(resDerivado.status).toBe(200);
+    expect(resDerivado.body.videoEliminado.miniaturaEliminada).toBe(false);
+    expect(mockDestroy).toHaveBeenCalledTimes(1);
+    expect(mockDestroy).toHaveBeenCalledWith("galeria/videos/b", { resource_type: "video" });
+  });
+
+  it("POST /api/categorias acepta imagenURL como texto y deduce el publicId si es de Cloudinary", async () => {
+    const token = await tokenAdmin();
+    const urlExistente = "https://res.cloudinary.com/demo/image/upload/v1/categorias/faldas.jpg";
+
+    const res = await request(app)
+      .post("/api/categorias")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ nombre: "Faldas", imagenURL: urlExistente });
+
+    expect(res.status).toBe(201);
+    expect(res.body.categoria.imagen).toEqual({ url: urlExistente, publicId: "categorias/faldas" });
+    expect(mockUploadStream).not.toHaveBeenCalled();
   });
 
   it("GET /api/categorias incluye imagenURL de compatibilidad junto con el subdocumento", async () => {

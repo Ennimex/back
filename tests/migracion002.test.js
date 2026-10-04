@@ -49,6 +49,14 @@ const sembrarDatosAntiguos = async () => {
     miniatura: `${CLOUD}/video/upload/c_scale,w_480/so_0/galeria/videos/fest.jpg`,
     miniaturaPublicId: "fest",
   });
+  // Video con una portada subida aparte (imagen propia, no derivada del video)
+  await Video.collection.insertOne({
+    titulo: "Con portada propia",
+    url: `${CLOUD}/video/upload/v6/galeria/videos/portada.mp4`,
+    publicId: "galeria/videos/portada",
+    miniatura: `${CLOUD}/image/upload/v7/galeria/miniaturas/portada-propia.jpg`,
+    miniaturaPublicId: "portada-propia",
+  });
 };
 
 describe("migración 002 (fase 2: imágenes como { url, publicId })", () => {
@@ -63,7 +71,7 @@ describe("migración 002 (fase 2: imágenes como { url, publicId })", () => {
     expect(salida).toMatch(/Fotos: 1 documento/);
     expect(salida).toMatch(/Colaboradores: 1 documento/);
     expect(salida).toMatch(/Videos sin publicId del archivo: 1/);
-    expect(salida).toMatch(/Videos \(miniatura\): 1 documento/);
+    expect(salida).toMatch(/Videos \(miniatura\): 2 documento/);
 
     const categoria = await Categoria.collection.findOne({});
     expect(typeof categoria.imagenURL).toBe("string");
@@ -102,11 +110,21 @@ describe("migración 002 (fase 2: imágenes como { url, publicId })", () => {
     expect(colaborador.imagen).toEqual({ url: `${CLOUD}/image/upload/v4/colaboradores/ana.jpg`, publicId: "colaboradores/ana-guardado" });
     expect(colaborador.imagenPublicId).toBeUndefined();
 
-    // Video: publicId del archivo deducido de la URL; la miniatura lo comparte
-    const video = await Video.collection.findOne({});
+    // Video: publicId del archivo deducido de la URL; la miniatura derivada lo comparte
+    const video = await Video.collection.findOne({ titulo: "Festival" });
     expect(video.publicId).toBe("galeria/videos/fest");
     expect(video.miniatura).toEqual({ url: `${CLOUD}/video/upload/c_scale,w_480/so_0/galeria/videos/fest.jpg`, publicId: "galeria/videos/fest" });
     expect(video.miniaturaPublicId).toBeUndefined();
+
+    // Video con portada propia: la miniatura conserva su propio publicId (el de su URL,
+    // no el nombre suelto que guardaba miniaturaPublicId) para poder borrarla después
+    const videoConPortada = await Video.collection.findOne({ titulo: "Con portada propia" });
+    expect(videoConPortada.publicId).toBe("galeria/videos/portada");
+    expect(videoConPortada.miniatura).toEqual({
+      url: `${CLOUD}/image/upload/v7/galeria/miniaturas/portada-propia.jpg`,
+      publicId: "galeria/miniaturas/portada-propia",
+    });
+    expect(videoConPortada.miniaturaPublicId).toBeUndefined();
 
     // Los endpoints siguen entregando los campos viejos como virtuales
     const resCategorias = await request(app).get("/api/categorias");
@@ -114,7 +132,8 @@ describe("migración 002 (fase 2: imágenes como { url, publicId })", () => {
     const resFotos = await request(app).get("/api/fotos");
     expect(resFotos.body[0].url).toBe(`${CLOUD}/image/upload/v1791076698/galeria/fotos/vbm887yxywbkwj8owooe.jpg`);
     const resVideos = await request(app).get("/api/videos");
-    expect(resVideos.body[0].miniaturaURL).toContain("/galeria/videos/fest.jpg");
+    const videoFestivalEnApi = resVideos.body.find((v) => v.titulo === "Festival");
+    expect(videoFestivalEnApi.miniaturaURL).toContain("/galeria/videos/fest.jpg");
 
     // Idempotencia
     const segundaSalida = correrMigracion();
@@ -125,5 +144,7 @@ describe("migración 002 (fase 2: imágenes como { url, publicId })", () => {
     expect(segundaSalida).toMatch(/Colaboradores: 0 documento/);
     expect(segundaSalida).toMatch(/Videos sin publicId del archivo: 0/);
     expect(segundaSalida).toMatch(/Videos \(miniatura\): 0 documento/);
+    const videosEnBase = await Video.collection.countDocuments({});
+    expect(videosEnBase).toBe(2);
   });
 });

@@ -13,6 +13,7 @@ const {
   subirImagen,
   eliminarImagen,
   publicIdDeImagen,
+  extraerPublicIdDeUrl,
 } = require("../utils/imagenesCloudinary");
 
 // Carpeta de Cloudinary donde viven las imágenes de categorías
@@ -62,8 +63,12 @@ const createCategoria = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Ya existe una categoría con ese nombre");
   }
 
-  // Imagen: el archivo subido a Cloudinary o, si no viene archivo, ninguna
-  let imagen = { url: "", publicId: "" };
+  // Imagen (igual que en productos): si el panel manda una URL ya existente
+  // como texto se guarda tal cual; si viene archivo, se sube y tiene prioridad
+  let imagen = {
+    url: req.body.imagenURL || "",
+    publicId: extraerPublicIdDeUrl(req.body.imagenURL || ""),
+  };
   if (req.file) {
     imagen = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
   }
@@ -98,6 +103,14 @@ const updateCategoria = asyncHandler(async (req, res) => {
     nombre: req.body.nombre,
     descripcion: req.body.descripcion,
   };
+
+  // Una URL como texto reemplaza la imagen (igual que en productos)
+  if (req.body.imagenURL !== undefined) {
+    datosActualizados.imagen = {
+      url: req.body.imagenURL,
+      publicId: extraerPublicIdDeUrl(req.body.imagenURL),
+    };
+  }
 
   // Si viene una nueva imagen, subirla y borrar la anterior de Cloudinary
   if (req.file) {

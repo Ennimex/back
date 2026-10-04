@@ -49,6 +49,19 @@ const generarMiniatura = (publicIdDelVideo) => {
   }
 };
 
+// La miniatura puede ser una transformación del propio video (comparte su
+// publicId: no hay archivo aparte) o una imagen subida por separado (tiene su
+// propio publicId). Solo en el segundo caso hay un archivo que borrar.
+// Resultado: true si se pidió borrar una miniatura aparte, false si no había.
+const eliminarMiniaturaSiEsAparte = async (video, publicIdDelVideo) => {
+  const publicIdDeMiniatura = video.miniatura ? video.miniatura.publicId : '';
+  const esArchivoAparte = Boolean(publicIdDeMiniatura) && publicIdDeMiniatura !== publicIdDelVideo;
+  if (!esArchivoAparte) {
+    return false;
+  }
+  return eliminarArchivo(publicIdDeMiniatura, 'image');
+};
+
 // Sube un video a Cloudinary por trozos, con reintentos cuando el error es de
 // tiempo de espera (código 499). Resultado: la respuesta de Cloudinary.
 async function subirVideoACloudinary(buffer, opciones = {}) {
@@ -179,9 +192,11 @@ const updateVideo = asyncHandler(async (req, res) => {
       timeout: 600000, // 10 minutos en total
     });
 
-    // El publicId guardado o, en videos antiguos, el deducido de la URL
+    // El publicId guardado o, en videos antiguos, el deducido de la URL.
+    // Se borra el archivo anterior y, si tenía miniatura aparte, también ella.
     const publicIdAnterior = videoExistente.publicId || extraerPublicIdDeUrl(videoExistente.url);
     await eliminarArchivo(publicIdAnterior, 'video');
+    await eliminarMiniaturaSiEsAparte(videoExistente, publicIdAnterior);
 
     datosActualizados.url = resultadoDeSubida.secure_url;
     datosActualizados.publicId = resultadoDeSubida.public_id;
@@ -204,8 +219,9 @@ const updateVideo = asyncHandler(async (req, res) => {
   });
 });
 
-// Eliminar video (borrado real) y su archivo en Cloudinary. La miniatura es
-// una transformación del mismo archivo, así que se va con él.
+// Eliminar video (borrado real) y sus archivos en Cloudinary: el video y, si
+// la miniatura es una imagen subida aparte, también ella. Una miniatura que
+// es transformación del mismo video se va con él sin llamada extra.
 const deleteVideo = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
@@ -220,6 +236,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
 
   const publicIdDelVideo = video.publicId || extraerPublicIdDeUrl(video.url);
   const archivoEliminado = await eliminarArchivo(publicIdDelVideo, 'video');
+  const miniaturaEliminada = await eliminarMiniaturaSiEsAparte(video, publicIdDelVideo);
   await Video.findByIdAndDelete(id);
 
   res.json({
@@ -228,6 +245,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
       id: video._id,
       titulo: video.titulo,
       archivoEliminado,
+      miniaturaEliminada,
     },
   });
 });

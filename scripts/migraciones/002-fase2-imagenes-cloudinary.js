@@ -10,8 +10,10 @@
 //        colaboradores imagen (texto) + imagenPublicId -> imagen
 //        videos        miniatura (texto) + miniaturaPublicId -> miniatura
 //   2. Para documentos sin publicId, lo deduce de la URL de Cloudinary.
-//   3. En videos, completa `publicId` del archivo si faltaba; la miniatura es
-//      una transformación del propio video, así que lleva el mismo publicId.
+//   3. En videos, completa `publicId` del archivo si faltaba. La miniatura
+//      puede ser una transformación del propio video (entonces comparte su
+//      publicId y no hay archivo aparte) o una imagen subida por separado
+//      (entonces conserva su propio publicId para poder borrarla después).
 //
 // Es idempotente: solo toca documentos con la forma vieja o sin publicId.
 // Con --simulacion solo cuenta e informa, sin escribir.
@@ -28,23 +30,28 @@ const Video = require('../../models/Video');
 // quede como { url, publicId }. Trabaja sobre el documento crudo.
 // Resultado: { set, unset } con los operadores a aplicar, o null si no hay cambios.
 const calcularCambiosDeImagen = (documento, opciones) => {
-  const { campoViejo, campoNuevo, campoViejoPublicId, publicIdAlternativo } = opciones;
+  const { campoViejo, campoNuevo, campoViejoPublicId, resolverPublicId } = opciones;
   const valorViejo = documento[campoViejo];
   const valorNuevo = documento[campoNuevo];
   const set = {};
   const unset = {};
 
-  // Caso A: todavía tiene la forma vieja (la URL como texto).
-  // Precedencia del publicId: el alternativo (p. ej. el del video para su
-  // miniatura), luego el que el documento ya guardaba, y al final el que se
-  // deduce de la URL.
+  // Cómo se obtiene el publicId de una URL: con la regla propia de la
+  // colección (si la tiene), o bien el que el documento ya guardaba y, si no,
+  // el que se deduce de la URL de Cloudinary.
+  const obtenerPublicId = (url) => {
+    if (resolverPublicId) {
+      return resolverPublicId(documento, url) || '';
+    }
+    const publicIdGuardado = campoViejoPublicId ? documento[campoViejoPublicId] || '' : '';
+    return publicIdGuardado || extraerPublicIdDeUrl(url);
+  };
+
+  // Caso A: todavía tiene la forma vieja (la URL como texto)
   const tieneFormaVieja = typeof valorViejo === 'string';
   if (tieneFormaVieja) {
     const url = valorViejo;
-    const publicIdAlternativoCalculado = publicIdAlternativo ? publicIdAlternativo(documento) : '';
-    const publicIdGuardado = campoViejoPublicId ? documento[campoViejoPublicId] || '' : '';
-    const publicIdDeducido = publicIdAlternativoCalculado || publicIdGuardado || extraerPublicIdDeUrl(url);
-    set[campoNuevo] = { url: url || '', publicId: url ? publicIdDeducido : '' };
+    set[campoNuevo] = { url: url || '', publicId: url ? obtenerPublicId(url) : '' };
 
     if (campoViejo !== campoNuevo) unset[campoViejo] = '';
     if (campoViejoPublicId) unset[campoViejoPublicId] = '';
@@ -54,7 +61,7 @@ const calcularCambiosDeImagen = (documento, opciones) => {
   // Caso B: ya es objeto pero sin publicId y la URL permite deducirlo
   const esObjetoSinPublicId = valorNuevo && typeof valorNuevo === 'object' && valorNuevo.url && !valorNuevo.publicId;
   if (esObjetoSinPublicId) {
-    const publicIdDeducido = (publicIdAlternativo ? publicIdAlternativo(documento) : '') || extraerPublicIdDeUrl(valorNuevo.url);
+    const publicIdDeducido = obtenerPublicId(valorNuevo.url);
     if (publicIdDeducido) {
       set[`${campoNuevo}.publicId`] = publicIdDeducido;
       return { set, unset };
@@ -62,6 +69,22 @@ const calcularCambiosDeImagen = (documento, opciones) => {
   }
 
   return null;
+};
+
+// Regla para la miniatura de un video. Si la URL es una transformación del
+// propio video (su public_id coincide con el del video), comparte el publicId
+// del video y no existe un archivo aparte. Si apunta a otro archivo (una
+// imagen subida por separado), conserva su propio publicId para poder
+// borrarla después. El `miniaturaPublicId` viejo solo guardaba el nombre del
+// archivo sin carpeta, así que se usa únicamente como último recurso.
+const publicIdDeMiniaturaDeVideo = (video, urlDeMiniatura) => {
+  const publicIdDelVideo = video.publicId || extraerPublicIdDeUrl(video.url);
+  const publicIdSegunLaUrl = extraerPublicIdDeUrl(urlDeMiniatura);
+  const esTransformacionDelVideo = publicIdSegunLaUrl === publicIdDelVideo;
+  if (esTransformacionDelVideo) {
+    return publicIdDelVideo;
+  }
+  return publicIdSegunLaUrl || video.miniaturaPublicId || '';
 };
 
 // Recorre una colección y aplica los cambios de imagen a cada documento.
@@ -122,9 +145,8 @@ ejecutarMigracion('002 Fase 2: imágenes de Cloudinary como { url, publicId }', 
   await migrarImagenesDe(Video, 'Videos (miniatura)', {
     campoViejo: 'miniatura',
     campoNuevo: 'miniatura',
-    // El miniaturaPublicId viejo solo guardaba el nombre del archivo; se elimina
+    // El campo viejo se retira: el publicId queda dentro de `miniatura`
     campoViejoPublicId: 'miniaturaPublicId',
-    // La miniatura es una transformación del video: comparte su publicId
-    publicIdAlternativo: (video) => video.publicId || extraerPublicIdDeUrl(video.url),
+    resolverPublicId: publicIdDeMiniaturaDeVideo,
   });
 });
