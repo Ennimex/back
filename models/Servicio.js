@@ -9,7 +9,7 @@ const ServicioSchema = new mongoose.Schema(
     // Imagen en Cloudinary: { url, publicId }. Antes era solo la URL en texto.
     imagen: { type: EsquemaImagen, default: () => ({}) },
   },
-  { toJSON: { virtuals: true }, toObject: { virtuals: true } }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 // La URL como texto, por comodidad para el front (`servicio.imagenURL`)
@@ -21,4 +21,5 @@ ServicioSchema.virtual('imagenURL').get(function () {
 // al crear/actualizar un servicio.
 ServicioSchema.index({ nombre: 1 });
 
-module.exports = mongoose.model('Servicios', ServicioSchema);
+// Modelo en singular; tercer argumento: nombre fijo de la colección
+module.exports = mongoose.model('Servicio', ServicioSchema, 'servicios');

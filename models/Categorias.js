@@ -18,7 +18,7 @@ const CategoriaSchema = new mongoose.Schema(
     // que la referencian conservan su categoría y se puede reactivar.
     activo: { type: Boolean, default: true, index: true },
   },
-  { toJSON: { virtuals: true }, toObject: { virtuals: true } }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 // Compatibilidad temporal: el front y la app siguen leyendo `imagenURL` como
@@ -27,4 +27,5 @@ CategoriaSchema.virtual("imagenURL").get(function () {
   return this.imagen ? this.imagen.url : "";
 });
 
-module.exports = mongoose.model("Categoria", CategoriaSchema);
+// Tercer argumento: nombre fijo de la colección (sin pluralización automática)
+module.exports = mongoose.model("Categoria", CategoriaSchema, "categorias");

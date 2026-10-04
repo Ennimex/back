@@ -10,7 +10,7 @@ const ColaboradorSchema = new mongoose.Schema(
     // (imagen e imagenPublicId); la migración 002 los junta aquí.
     imagen: { type: EsquemaImagen, default: () => ({}) },
   },
-  { toJSON: { virtuals: true }, toObject: { virtuals: true } }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 // La URL como texto, por comodidad para el front (`colaborador.imagenURL`)
@@ -18,4 +18,5 @@ ColaboradorSchema.virtual('imagenURL').get(function () {
   return this.imagen ? this.imagen.url : '';
 });
 
-module.exports = mongoose.model('Colaboradores', ColaboradorSchema);
+// Modelo en singular; tercer argumento: nombre fijo de la colección
+module.exports = mongoose.model('Colaborador', ColaboradorSchema, 'colaboradores');

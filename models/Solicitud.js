@@ -17,7 +17,7 @@ const ProductoPedidoSchema = new mongoose.Schema(
     },
     tallaElegida: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tallas',
+      ref: 'Talla',
       default: null,
     },
     cantidad: {
@@ -85,15 +85,13 @@ const SolicitudSchema = new mongoose.Schema(
     },
     // Bitácora de cambios de estado, del más antiguo al más reciente
     historialEstados: { type: [CambioEstadoSchema], default: [] },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
-  { toJSON: { virtuals: true }, toObject: { virtuals: true } }
+  // timestamps: createdAt sustituye al campo manual que había; updatedAt es nuevo
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
-const Solicitud = mongoose.model('Solicitud', SolicitudSchema);
+// Tercer argumento: nombre fijo de la colección ("solicitudes", no "solicituds")
+const Solicitud = mongoose.model('Solicitud', SolicitudSchema, 'solicitudes');
 Solicitud.ESTADOS = ESTADOS_SOLICITUD;
 
 module.exports = Solicitud;

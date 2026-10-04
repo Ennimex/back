@@ -113,9 +113,9 @@ const avisarAlNegocio = async (usuario, mensaje, renglonesDelPedido) => {
       return;
     }
     await sendSolicitudEmail(correoDestino, {
-      nombre: usuario.name,
+      nombre: usuario.nombre,
       email: usuario.email,
-      telefono: usuario.phone,
+      telefono: usuario.telefono,
       mensaje,
       productos: renglonesDelPedido,
     });
@@ -140,7 +140,7 @@ const crearSolicitud = asyncHandler(async (req, res) => {
   }
 
   // Copia de los datos de contacto del usuario al momento de pedir
-  const usuario = await User.findById(req.user.id).select('name email phone');
+  const usuario = await User.findById(req.user.id).select('nombre email telefono');
   if (!usuario) {
     throw new ApiError(404, 'Usuario no encontrado');
   }
@@ -151,9 +151,9 @@ const crearSolicitud = asyncHandler(async (req, res) => {
   // La solicitud nace "pendiente" y ese estado inicial queda en el historial
   const solicitudCreada = await Solicitud.create({
     usuario: usuario._id,
-    nombre: usuario.name,
+    nombre: usuario.nombre,
     email: usuario.email,
-    telefono: usuario.phone,
+    telefono: usuario.telefono,
     productos: renglonesDelPedido,
     mensaje: mensajeRecortado,
     estado: 'pendiente',

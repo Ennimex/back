@@ -1,15 +1,19 @@
 const mongoose = require('mongoose');
 
-const EventoSchema = new mongoose.Schema({
-  titulo: String,
-  descripcion: String,
-  fecha: Date,
-  ubicacion: String,
-  horaInicio: String, // Formato: "14:30" (HH:mm)
-  horaFin: String,    // Formato: "16:30" (HH:mm)
-});
+const EventoSchema = new mongoose.Schema(
+  {
+    titulo: String,
+    descripcion: String,
+    fecha: Date,
+    ubicacion: String,
+    horaInicio: String, // Formato: "14:30" (HH:mm)
+    horaFin: String, // Formato: "16:30" (HH:mm)
+  },
+  { timestamps: true }
+);
 
 // Índice para listar/ordenar por fecha (getEventos hace sort({ fecha: -1 }))
 EventoSchema.index({ fecha: -1 });
 
-module.exports = mongoose.model('Eventos', EventoSchema);
+// Modelo en singular; tercer argumento: nombre fijo de la colección
+module.exports = mongoose.model('Evento', EventoSchema, 'eventos');

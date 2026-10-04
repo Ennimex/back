@@ -16,4 +16,5 @@ const MensajeBuzonSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("MensajeBuzon", MensajeBuzonSchema);
+// Tercer argumento: nombre fijo de la colección ("mensajesbuzon", no "mensajebuzons")
+module.exports = mongoose.model("MensajeBuzon", MensajeBuzonSchema, "mensajesbuzon");

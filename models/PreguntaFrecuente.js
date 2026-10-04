@@ -13,4 +13,5 @@ const PreguntaFrecuenteSchema = new mongoose.Schema(
 
 PreguntaFrecuenteSchema.index({ activa: 1, orden: 1 });
 
-module.exports = mongoose.model("PreguntaFrecuente", PreguntaFrecuenteSchema);
+// Tercer argumento: nombre fijo de la colección (la que ya existe en la base)
+module.exports = mongoose.model("PreguntaFrecuente", PreguntaFrecuenteSchema, "preguntafrecuentes");

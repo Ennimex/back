@@ -10,7 +10,7 @@ const ProductoSchema = new mongoose.Schema(
     imagen: { type: EsquemaImagen, default: () => ({}) },
     localidadId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Localidades',
+      ref: 'Localidad',
       required: true,
     },
     // Categoría del producto (opcional: los productos antiguos pueden no tenerla)
@@ -22,7 +22,7 @@ const ProductoSchema = new mongoose.Schema(
     tallasDisponibles: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Tallas',
+        ref: 'Talla',
       },
     ],
     // Borrado lógico: el admin "elimina" poniendo activo en false. El producto
@@ -30,7 +30,7 @@ const ProductoSchema = new mongoose.Schema(
     // y favoritos que lo referencian, y se puede reactivar.
     activo: { type: Boolean, default: true, index: true },
   },
-  { toJSON: { virtuals: true }, toObject: { virtuals: true } }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 // Compatibilidad temporal: el front y la app siguen leyendo `imagenURL` como
@@ -45,4 +45,5 @@ ProductoSchema.index({ localidadId: 1 });
 ProductoSchema.index({ categoriaId: 1 });
 ProductoSchema.index({ tallasDisponibles: 1 });
 
-module.exports = mongoose.model('Producto', ProductoSchema);
+// Tercer argumento: nombre fijo de la colección (sin pluralización automática)
+module.exports = mongoose.model('Producto', ProductoSchema, 'productos');

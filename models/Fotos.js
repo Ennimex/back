@@ -10,16 +10,13 @@ const FotoSchema = new mongoose.Schema(
     // Evento al que pertenece la foto (opcional)
     eventoId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Eventos',
+      ref: 'Evento',
       default: null,
       index: true,
     },
-    fechaSubida: {
-      type: Date,
-      default: Date.now,
-    },
   },
-  { toJSON: { virtuals: true }, toObject: { virtuals: true } }
+  // timestamps: createdAt sustituye al antiguo fechaSubida (migración 003)
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 // Compatibilidad temporal: el front y la app siguen leyendo `foto.url`.
@@ -27,4 +24,10 @@ FotoSchema.virtual('url').get(function () {
   return this.imagen ? this.imagen.url : '';
 });
 
-module.exports = mongoose.model('Foto', FotoSchema);
+// Compatibilidad temporal: la app declara `fechaSubida`; ahora es createdAt.
+FotoSchema.virtual('fechaSubida').get(function () {
+  return this.createdAt;
+});
+
+// Tercer argumento: nombre fijo de la colección
+module.exports = mongoose.model('Foto', FotoSchema, 'fotos');

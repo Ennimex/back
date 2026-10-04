@@ -54,4 +54,5 @@ const ConfiguracionSitioSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("ConfiguracionSitio", ConfiguracionSitioSchema);
+// Tercer argumento: nombre fijo de la colección (sin pluralización automática)
+module.exports = mongoose.model("ConfiguracionSitio", ConfiguracionSitioSchema, "configuracionsitios");

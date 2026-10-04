@@ -18,16 +18,13 @@ const VideoSchema = new mongoose.Schema(
     // Evento al que pertenece el video (opcional)
     eventoId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Eventos',
+      ref: 'Evento',
       default: null,
       index: true,
     },
-    fechaSubida: {
-      type: Date,
-      default: Date.now,
-    },
   },
-  { toJSON: { virtuals: true }, toObject: { virtuals: true } }
+  // timestamps: createdAt sustituye al antiguo fechaSubida (migración 003)
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 // La URL de la miniatura como texto, por comodidad para el front
@@ -35,4 +32,10 @@ VideoSchema.virtual('miniaturaURL').get(function () {
   return this.miniatura ? this.miniatura.url : '';
 });
 
-module.exports = mongoose.model('Video', VideoSchema);
+// Compatibilidad temporal: la app declara `fechaSubida`; ahora es createdAt.
+VideoSchema.virtual('fechaSubida').get(function () {
+  return this.createdAt;
+});
+
+// Tercer argumento: nombre fijo de la colección
+module.exports = mongoose.model('Video', VideoSchema, 'videos');

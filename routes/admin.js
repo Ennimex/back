@@ -79,7 +79,8 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
   const [users, usuariosRecientes, productosRecientes, categoriasRecientes, solicitudesRecientes] =
     await Promise.all([
       User.find({}, 'createdAt').lean(),
-      User.find({}, 'name email role createdAt').sort({ createdAt: -1 }).limit(5).lean(),
+      // Sin .lean() para que la respuesta incluya el alias `name` junto a `nombre`
+      User.find({}, 'nombre email role createdAt').sort({ createdAt: -1 }).limit(5),
       Producto.find({}, 'nombre createdAt').sort({ _id: -1 }).limit(3).lean(),
       Categoria.find({}, 'nombre createdAt').sort({ _id: -1 }).limit(2).lean(),
       // Sin .lean() para que los renglones incluyan los virtuales de compatibilidad (nombre, imagenURL)
@@ -108,13 +109,16 @@ router.get('/users', asyncHandler(async (req, res) => {
 // Editar información de usuario (incluida la contraseña, opcional)
 router.put('/users/:userId', asyncHandler(async (req, res) => {
   const { userId } = req.params;
-  const { name, email, phone, role, password } = req.body;
+  const { email, role, password } = req.body;
+  // Se aceptan los nombres nuevos (nombre, telefono) y los viejos (name, phone)
+  const nombre = req.body.nombre ?? req.body.name;
+  const telefono = req.body.telefono ?? req.body.phone;
 
   // Preparar los campos a actualizar
   const updateData = {};
 
-  if (name) updateData.name = name;
-  if (phone) updateData.phone = phone;
+  if (nombre) updateData.nombre = nombre;
+  if (telefono) updateData.telefono = telefono;
   if (role) {
     if (!['user', 'admin'].includes(role)) {
       return res.status(400).json({ error: 'Rol inválido' });
@@ -170,7 +174,10 @@ router.delete('/users/:userId', asyncHandler(async (req, res) => {
 
 // Agregar un nuevo usuario
 router.post('/users', asyncHandler(async (req, res) => {
-  const { name, email, phone, password, role = 'user' } = req.body;
+  const { email, password, role = 'user' } = req.body;
+  // Se aceptan los nombres nuevos (nombre, telefono) y los viejos (name, phone)
+  const nombre = req.body.nombre ?? req.body.name;
+  const telefono = req.body.telefono ?? req.body.phone;
 
   // Validar que el correo no exista
   const existingUser = await User.findOne({ email });
@@ -185,9 +192,9 @@ router.post('/users', asyncHandler(async (req, res) => {
 
   // Crear nuevo usuario
   const user = await User.create({
-    name,
+    nombre,
     email,
-    phone,
+    telefono,
     password,
     role
   });

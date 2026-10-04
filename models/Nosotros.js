@@ -1,9 +1,14 @@
 const mongoose = require('mongoose');
 
-const NosotrosSchema = new mongoose.Schema({
-  mision: String,
-  vision: String,
-  historia: String
-});
+// Textos de la sección "Nosotros". Es un documento único (ver nosotrosController).
+const NosotrosSchema = new mongoose.Schema(
+  {
+    mision: String,
+    vision: String,
+    historia: String,
+  },
+  { timestamps: true }
+);
 
-module.exports = mongoose.model('Nosotros', NosotrosSchema);
+// Tercer argumento: nombre fijo de la colección
+module.exports = mongoose.model('Nosotros', NosotrosSchema, 'nosotros');

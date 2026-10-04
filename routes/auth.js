@@ -53,7 +53,8 @@ router.post('/login', async (req, res) => {
     
     res.json({ 
       token, 
-      user: { role: user.role, email: user.email, name: user.name },
+      // `name` se conserva por compatibilidad con el front y la app; el campo real es `nombre`
+      user: { role: user.role, email: user.email, nombre: user.nombre, name: user.nombre },
       expiresIn,
       tokenExpiration
     });
@@ -65,7 +66,10 @@ router.post('/login', async (req, res) => {
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { email, password } = req.body;
+    // Se aceptan los nombres nuevos (nombre, telefono) y los viejos (name, phone)
+    const nombre = req.body.nombre ?? req.body.name;
+    const telefono = req.body.telefono ?? req.body.phone;
 
     // Verificar si el usuario ya existe
     const existingUser = await User.findOne({ email });
@@ -75,10 +79,10 @@ router.post('/register', async (req, res) => {
 
     // Crear nuevo usuario
     const user = new User({
-      name,
+      nombre,
       email,
       password,
-      phone,
+      telefono,
       role: 'user',
     });
 
