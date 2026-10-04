@@ -1,9 +1,6 @@
 const Categoria = require("../models/Categorias");
 const Producto = require("../models/Producto");
 const mongoose = require("mongoose");
-const multer = require("multer");
-const cloudinary = require("../config/cloudinaryConfig");
-const streamifier = require("streamifier");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { FILTRO_ACTIVOS } = require("../utils/filtroActivos");
@@ -11,32 +8,25 @@ const {
   buscarProductosActivosQueReferencian,
   responderConflictoPorProductos,
 } = require("../utils/bloqueoPorReferencias");
+const {
+  multerDeImagenes,
+  subirImagen,
+  eliminarImagen,
+  publicIdDeImagen,
+} = require("../utils/imagenesCloudinary");
+
+// Carpeta de Cloudinary donde viven las imágenes de categorías
+const CARPETA_CLOUDINARY = "categorias";
 
 // Multer en memoria: el archivo llega como buffer y se sube a Cloudinary
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
-// Subir un buffer de imagen a Cloudinary (promesa sobre upload_stream)
-const subirImagen = (buffer, folder = "categorias") =>
-  new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream({ folder }, (error, result) => {
-      if (error) return reject(error);
-      resolve(result);
-    });
-    streamifier.createReadStream(buffer).pipe(stream);
-  });
-
-// Derivar el public_id de Cloudinary a partir de la URL guardada
-const publicIdDesdeUrl = (url) => {
-  const partesDeLaUrl = url.split("/");
-  return "categorias/" + partesDeLaUrl[partesDeLaUrl.length - 1].split(".")[0];
-};
+const upload = multerDeImagenes();
 
 // Lista categorías según el filtro recibido y agrega a cada una cuántos
 // productos activos tiene (en una sola consulta de agregación).
 // Resultado: arreglo de categorías con `productosCount`.
 const listarCategoriasConConteo = async (filtroDeCategorias) => {
-  const categorias = await Categoria.find(filtroDeCategorias).lean();
+  // Sin .lean(): se convierte con virtuales para que la respuesta incluya imagenURL
+  const categorias = await Categoria.find(filtroDeCategorias);
 
   const conteosPorCategoria = await Producto.aggregate([
     { $match: { categoriaId: { $ne: null }, ...FILTRO_ACTIVOS } },
@@ -48,7 +38,7 @@ const listarCategoriasConConteo = async (filtroDeCategorias) => {
   });
 
   return categorias.map((categoria) => ({
-    ...categoria,
+    ...categoria.toObject({ virtuals: true }),
     productosCount: mapaDeConteos[String(categoria._id)] || 0,
   }));
 };
@@ -72,16 +62,16 @@ const createCategoria = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Ya existe una categoría con ese nombre");
   }
 
-  let imagenURL = req.body.imagenURL || "";
+  // Imagen: el archivo subido a Cloudinary o, si no viene archivo, ninguna
+  let imagen = { url: "", publicId: "" };
   if (req.file) {
-    const resultadoDeSubida = await subirImagen(req.file.buffer);
-    imagenURL = resultadoDeSubida.secure_url;
+    imagen = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
   }
 
   const nuevaCategoria = new Categoria({
     nombre: req.body.nombre,
     descripcion: req.body.descripcion,
-    imagenURL,
+    imagen,
   });
 
   const categoriaGuardada = await nuevaCategoria.save();
@@ -109,19 +99,11 @@ const updateCategoria = asyncHandler(async (req, res) => {
     descripcion: req.body.descripcion,
   };
 
-  // Si viene una nueva imagen, subirla y borrar la anterior
+  // Si viene una nueva imagen, subirla y borrar la anterior de Cloudinary
   if (req.file) {
-    const resultadoDeSubida = await subirImagen(req.file.buffer);
-
-    if (categoriaExistente.imagenURL) {
-      try {
-        await cloudinary.uploader.destroy(publicIdDesdeUrl(categoriaExistente.imagenURL));
-      } catch (cloudinaryError) {
-        console.error("Error al eliminar imagen antigua:", cloudinaryError.message);
-      }
-    }
-
-    datosActualizados.imagenURL = resultadoDeSubida.secure_url;
+    const imagenNueva = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
+    await eliminarImagen(publicIdDeImagen(categoriaExistente.imagen));
+    datosActualizados.imagen = imagenNueva;
   }
 
   const categoriaActualizada = await Categoria.findByIdAndUpdate(id, datosActualizados, {

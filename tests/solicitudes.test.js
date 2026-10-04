@@ -26,7 +26,7 @@ const crearCatalogoBasico = async () => {
   const talla = await Talla.create({ categoriaId: categoria._id, genero: "mujer", talla: "M" });
   const producto = await Producto.create({
     nombre: "Blusa bordada",
-    imagenURL: "https://res.cloudinary.com/demo/productos/blusa.jpg",
+    imagen: { url: "https://res.cloudinary.com/demo/productos/blusa.jpg", publicId: "productos/blusa" },
     localidadId: localidad._id,
     categoriaId: categoria._id,
     tallasDisponibles: [talla._id],

@@ -2,26 +2,23 @@ const Producto = require("../models/Producto");
 const Categoria = require("../models/Categorias");
 const Localidad = require("../models/Localidades");
 const Talla = require("../models/Tallas");
-const multer = require("multer");
-const cloudinary = require("../config/cloudinaryConfig");
-const streamifier = require("streamifier"); // importar para manejar streams
 const mongoose = require("mongoose");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const { FILTRO_ACTIVOS } = require("../utils/filtroActivos");
+const {
+  multerDeImagenes,
+  subirImagen,
+  eliminarImagen,
+  publicIdDeImagen,
+  extraerPublicIdDeUrl,
+} = require("../utils/imagenesCloudinary");
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+// Carpeta de Cloudinary donde viven las imágenes de productos
+const CARPETA_CLOUDINARY = "productos";
 
-// Subir un buffer de imagen a Cloudinary (promesa sobre upload_stream)
-const subirImagen = (buffer, folder = "productos") =>
-  new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream({ folder }, (error, result) => {
-      if (error) return reject(error);
-      resolve(result);
-    });
-    streamifier.createReadStream(buffer).pipe(stream);
-  });
+// Multer en memoria: el archivo llega como buffer y se sube a Cloudinary
+const upload = multerDeImagenes();
 
 // Poblar referencias de un query de productos (localidad, categoría y tallas)
 const poblarProducto = (query) =>
@@ -100,14 +97,15 @@ const verificarTallasDeLaCategoria = async (tallasIds, categoriaId) => {
 
 // Pública: productos activos con referencias pobladas
 // (devuelve [] cuando no hay productos; antes respondía 404 y rompía a los consumidores)
+// Sin .lean(): los documentos se serializan con virtuales (imagenURL).
 const getProductos = asyncHandler(async (req, res) => {
-  const productosActivos = await poblarProducto(Producto.find(FILTRO_ACTIVOS)).lean();
+  const productosActivos = await poblarProducto(Producto.find(FILTRO_ACTIVOS));
   res.json(productosActivos || []);
 });
 
 // Admin: todos los productos, activos y desactivados, para poder reactivarlos
 const getProductosAdmin = asyncHandler(async (req, res) => {
-  const todosLosProductos = await poblarProducto(Producto.find()).lean();
+  const todosLosProductos = await poblarProducto(Producto.find());
   res.json(todosLosProductos || []);
 });
 
@@ -132,13 +130,16 @@ const createProducto = asyncHandler(async (req, res) => {
     categoriaId,
     tipoTela: req.body.tipoTela,
     tallasDisponibles: tallasIds,
-    imagenURL: req.body.imagenURL || "",
+    // Si el panel manda una URL ya existente (sin archivo), se guarda tal cual
+    imagen: {
+      url: req.body.imagenURL || "",
+      publicId: extraerPublicIdDeUrl(req.body.imagenURL || ""),
+    },
   };
 
-  // Si viene un archivo, subirlo a Cloudinary
+  // Si viene un archivo, subirlo a Cloudinary (tiene prioridad sobre la URL)
   if (req.file) {
-    const resultadoDeSubida = await subirImagen(req.file.buffer, "productos");
-    datosDelProducto.imagenURL = resultadoDeSubida.secure_url;
+    datosDelProducto.imagen = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
   }
 
   const nuevoProducto = new Producto(datosDelProducto);
@@ -199,22 +200,18 @@ const updateProducto = asyncHandler(async (req, res) => {
   if (seCambiaCategoria) datosActualizados.categoriaId = categoriaResultante;
   if (req.body.tipoTela !== undefined) datosActualizados.tipoTela = req.body.tipoTela;
   if (seCambianTallas) datosActualizados.tallasDisponibles = tallasResultantes;
-  if (req.body.imagenURL !== undefined) datosActualizados.imagenURL = req.body.imagenURL;
+  if (req.body.imagenURL !== undefined) {
+    datosActualizados.imagen = {
+      url: req.body.imagenURL,
+      publicId: extraerPublicIdDeUrl(req.body.imagenURL),
+    };
+  }
 
   // Si viene una nueva imagen, subirla y borrar la anterior de Cloudinary
   if (req.file) {
-    const resultadoDeSubida = await subirImagen(req.file.buffer, "productos");
-
-    if (productoExistente.imagenURL) {
-      const publicIdAnterior = productoExistente.imagenURL.split("/").pop().split(".")[0];
-      try {
-        await cloudinary.uploader.destroy(`productos/${publicIdAnterior}`);
-      } catch (cloudinaryError) {
-        console.error("Error al eliminar imagen antigua de Cloudinary:", cloudinaryError.message);
-      }
-    }
-
-    datosActualizados.imagenURL = resultadoDeSubida.secure_url;
+    const imagenNueva = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
+    await eliminarImagen(publicIdDeImagen(productoExistente.imagen));
+    datosActualizados.imagen = imagenNueva;
   }
 
   const productoActualizado = await poblarProducto(

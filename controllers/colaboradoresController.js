@@ -1,21 +1,20 @@
 // controllers/colaboradoresController.js
 const Colaboradores = require("../models/Colaboradores");
-const cloudinary = require("../config/cloudinaryConfig");
-const multer = require("multer");
-const streamifier = require("streamifier");
+const mongoose = require("mongoose");
 const asyncHandler = require("../utils/asyncHandler");
+const ApiError = require("../utils/ApiError");
+const {
+  multerDeImagenes,
+  subirImagen,
+  eliminarImagen,
+  publicIdDeImagen,
+} = require("../utils/imagenesCloudinary");
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
+// Carpeta de Cloudinary donde viven las fotos de colaboradores
+const CARPETA_CLOUDINARY = "colaboradores";
 
-const subirACloudinary = (buffer, folder = "colaboradores") =>
-  new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream({ folder }, (error, result) => {
-      if (error) return reject(error);
-      resolve(result);
-    });
-    streamifier.createReadStream(buffer).pipe(stream);
-  });
+// Multer en memoria: el archivo llega como buffer y se sube a Cloudinary
+const upload = multerDeImagenes();
 
 // Obtener todos los colaboradores
 const getColaboradores = asyncHandler(async (req, res) => {
@@ -27,63 +26,61 @@ const getColaboradores = asyncHandler(async (req, res) => {
 const createColaborador = asyncHandler(async (req, res) => {
   const { nombre, rol, descripcion } = req.body;
   if (!nombre) {
-    return res.status(400).json({ error: "El nombre es requerido" });
+    throw new ApiError(400, "El nombre es requerido");
   }
 
-  const data = { nombre, rol, descripcion };
-
+  // Imagen: el archivo subido a Cloudinary o, si no viene archivo, ninguna
+  let imagen = { url: "", publicId: "" };
   if (req.file) {
-    const result = await subirACloudinary(req.file.buffer);
-    data.imagen = result.secure_url;
-    data.imagenPublicId = result.public_id;
+    imagen = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
   }
 
-  const colaborador = await Colaboradores.create(data);
+  const colaborador = await Colaboradores.create({ nombre, rol, descripcion, imagen });
   res.status(201).json(colaborador);
 });
 
-// Actualizar colaborador (admin)
+// Actualizar colaborador (admin): textos y foto opcional
 const updateColaborador = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    throw new ApiError(400, "ID de colaborador inválido");
+  }
+
   const colaborador = await Colaboradores.findById(req.params.id);
-  if (!colaborador) return res.status(404).json({ error: "Colaborador no encontrado" });
+  if (!colaborador) {
+    throw new ApiError(404, "Colaborador no encontrado");
+  }
 
   const { nombre, rol, descripcion } = req.body;
   if (nombre !== undefined) colaborador.nombre = nombre;
   if (rol !== undefined) colaborador.rol = rol;
   if (descripcion !== undefined) colaborador.descripcion = descripcion;
 
+  // Si viene una nueva foto, subirla y borrar la anterior de Cloudinary
   if (req.file) {
-    const result = await subirACloudinary(req.file.buffer);
-    // Borrar la imagen anterior si existía
-    if (colaborador.imagenPublicId) {
-      try {
-        await cloudinary.uploader.destroy(colaborador.imagenPublicId);
-      } catch (e) {
-        console.error("No se pudo borrar la imagen anterior:", e.message);
-      }
-    }
-    colaborador.imagen = result.secure_url;
-    colaborador.imagenPublicId = result.public_id;
+    const imagenNueva = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
+    await eliminarImagen(publicIdDeImagen(colaborador.imagen));
+    colaborador.imagen = imagenNueva;
   }
 
   await colaborador.save();
   res.json(colaborador);
 });
 
-// Eliminar colaborador (admin)
+// Eliminar colaborador (admin): borrado real y su foto en Cloudinary
 const deleteColaborador = asyncHandler(async (req, res) => {
-  const colaborador = await Colaboradores.findById(req.params.id);
-  if (!colaborador) return res.status(404).json({ error: "Colaborador no encontrado" });
-
-  if (colaborador.imagenPublicId) {
-    try {
-      await cloudinary.uploader.destroy(colaborador.imagenPublicId);
-    } catch (e) {
-      console.error("No se pudo borrar la imagen:", e.message);
-    }
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    throw new ApiError(400, "ID de colaborador inválido");
   }
 
+  const colaborador = await Colaboradores.findById(req.params.id);
+  if (!colaborador) {
+    throw new ApiError(404, "Colaborador no encontrado");
+  }
+
+  // Primero el archivo (por publicId) y luego el documento
+  await eliminarImagen(publicIdDeImagen(colaborador.imagen));
   await colaborador.deleteOne();
+
   res.json({ mensaje: "Colaborador eliminado correctamente" });
 });
 

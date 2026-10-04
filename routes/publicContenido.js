@@ -131,12 +131,13 @@ router.get('/galeria/videos/:id', asyncHandler(async (req, res) => {
 // Obtener toda la galería (fotos y videos combinados)
 router.get('/galeria', asyncHandler(async (req, res) => {
   // Obtener fotos y videos
-  const fotos = await Foto.find().lean();
-  const videos = await Video.find().lean();
+  // Sin .lean(): los documentos se convierten con virtuales (url de la foto)
+  const fotos = await Foto.find();
+  const videos = await Video.find();
 
   // Añadir un campo tipo para diferenciarlos en el frontend
-  const fotosConTipo = fotos.map(foto => ({ ...foto, tipo: 'foto' }));
-  const videosConTipo = videos.map(video => ({ ...video, tipo: 'video' }));
+  const fotosConTipo = fotos.map((foto) => ({ ...foto.toObject({ virtuals: true }), tipo: 'foto' }));
+  const videosConTipo = videos.map((video) => ({ ...video.toObject({ virtuals: true }), tipo: 'video' }));
 
   // Combinar y ordenar por fecha de creación (más recientes primero)
   const galeria = [...fotosConTipo, ...videosConTipo]
@@ -157,12 +158,13 @@ router.get('/galeria/pagina/:pagina', asyncHandler(async (req, res) => {
   const totalElementos = totalFotos + totalVideos;
 
   // Obtener ambos tipos de elementos
-  const fotos = await Foto.find().lean();
-  const videos = await Video.find().lean();
+  // Sin .lean(): los documentos se convierten con virtuales (url de la foto)
+  const fotos = await Foto.find();
+  const videos = await Video.find();
 
   // Combinar y agregar tipo
-  const fotosConTipo = fotos.map(foto => ({ ...foto, tipo: 'foto' }));
-  const videosConTipo = videos.map(video => ({ ...video, tipo: 'video' }));
+  const fotosConTipo = fotos.map((foto) => ({ ...foto.toObject({ virtuals: true }), tipo: 'foto' }));
+  const videosConTipo = videos.map((video) => ({ ...video.toObject({ virtuals: true }), tipo: 'video' }));
 
   // Combinar, ordenar y paginar
   const galeriaCompleta = [...fotosConTipo, ...videosConTipo]

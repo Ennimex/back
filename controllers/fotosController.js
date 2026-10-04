@@ -1,9 +1,19 @@
 const Foto = require('../models/Fotos');
-const cloudinary = require('../config/cloudinaryConfig');
-const multer = require('multer');
-const streamifier = require('streamifier'); // importar para manejar streams
 const mongoose = require('mongoose');
 const asyncHandler = require('../utils/asyncHandler');
+const ApiError = require('../utils/ApiError');
+const {
+  multerDeImagenes,
+  subirImagen,
+  eliminarImagen,
+  publicIdDeImagen,
+} = require('../utils/imagenesCloudinary');
+
+// Carpeta de Cloudinary donde viven las fotos de la galería
+const CARPETA_CLOUDINARY = 'galeria/fotos';
+
+// Multer en memoria (hasta 10 MB): el archivo llega como buffer y se sube a Cloudinary
+const upload = multerDeImagenes(10);
 
 // Normaliza el eventoId recibido: '' / undefined -> null; valida ObjectId si viene
 const parseEventoId = (valor) => {
@@ -13,38 +23,7 @@ const parseEventoId = (valor) => {
   return valor;
 };
 
-// Configurar multer para usar memoria en lugar de disco (compatible con Vercel)
-const storage = multer.memoryStorage();
-
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Solo se permiten imágenes'));
-    }
-  }
-});
-
-// Subir un buffer de imagen a Cloudinary (promesa sobre upload_stream)
-const subirImagen = (buffer, folder = 'galeria/fotos') =>
-  new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream({ folder }, (error, result) => {
-      if (error) return reject(error);
-      resolve(result);
-    });
-    streamifier.createReadStream(buffer).pipe(stream);
-  });
-
-// Derivar el public_id de Cloudinary a partir de la URL guardada
-const publicIdDesdeUrl = (url) => {
-  const urlParts = url.split('/');
-  return 'galeria/fotos/' + urlParts[urlParts.length - 1].split('.')[0];
-};
-
-// Obtener todas las fotos.
+// Obtener todas las fotos (más recientes primero).
 // Filtros opcionales: ?eventoId=<id> (fotos de un evento) o ?eventoId=null (fotos sin evento)
 const getFotos = asyncHandler(async (req, res) => {
   const { eventoId } = req.query;
@@ -53,104 +32,100 @@ const getFotos = asyncHandler(async (req, res) => {
     if (mongoose.Types.ObjectId.isValid(eventoId)) filtro.eventoId = eventoId;
     else if (eventoId === 'null' || eventoId === '') filtro.eventoId = null;
   }
-  const fotos = await Foto.find(filtro).sort({ _id: -1 }); // Más recientes primero
+  const fotos = await Foto.find(filtro).sort({ _id: -1 });
   res.json(fotos);
 });
 
 // Obtener una foto por ID
 const getFotoById = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    throw new ApiError(400, 'ID de foto inválido');
+  }
   const foto = await Foto.findById(req.params.id);
   if (!foto) {
-    return res.status(404).json({ error: 'Foto no encontrada' });
+    throw new ApiError(404, 'Foto no encontrada');
   }
   res.json(foto);
 });
 
-// Crear nueva foto
+// Crear nueva foto (la imagen es obligatoria)
 const createFoto = asyncHandler(async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'No se proporcionó ninguna imagen' });
+    throw new ApiError(400, 'No se proporcionó ninguna imagen');
   }
 
-  const result = await subirImagen(req.file.buffer);
+  const imagen = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
 
   const nuevaFoto = new Foto({
-    url: result.secure_url,
+    imagen,
     titulo: req.body.titulo || 'Sin título',
     descripcion: req.body.descripcion || '',
-    eventoId: parseEventoId(req.body.eventoId) || null
+    eventoId: parseEventoId(req.body.eventoId) || null,
   });
 
   const fotoGuardada = await nuevaFoto.save();
   res.status(201).json({
     mensaje: 'Foto subida correctamente',
-    foto: fotoGuardada
+    foto: fotoGuardada,
   });
 });
 
-// Actualizar foto
+// Actualizar foto (textos, evento e imagen opcional)
 const updateFoto = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { titulo, descripcion } = req.body;
 
-  // Buscar la foto existente
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, 'ID de foto inválido');
+  }
+
   const fotoExistente = await Foto.findById(id);
   if (!fotoExistente) {
-    return res.status(404).json({ error: 'Foto no encontrada' });
+    throw new ApiError(404, 'Foto no encontrada');
   }
 
-  // Preparar los datos de actualización
-  const updateData = {};
-  if (titulo) updateData.titulo = titulo;
-  if (descripcion) updateData.descripcion = descripcion;
-  const ev = parseEventoId(req.body.eventoId);
-  if (ev !== undefined) updateData.eventoId = ev;
+  // Preparar los datos de actualización (solo los campos provistos)
+  const datosActualizados = {};
+  if (titulo) datosActualizados.titulo = titulo;
+  if (descripcion) datosActualizados.descripcion = descripcion;
+  const eventoNormalizado = parseEventoId(req.body.eventoId);
+  if (eventoNormalizado !== undefined) datosActualizados.eventoId = eventoNormalizado;
 
-  // Si hay una nueva imagen, subirla y borrar la anterior
+  // Si viene una nueva imagen, subirla y borrar la anterior de Cloudinary
   if (req.file) {
-    const result = await subirImagen(req.file.buffer);
-
-    try {
-      await cloudinary.uploader.destroy(publicIdDesdeUrl(fotoExistente.url));
-    } catch (cloudinaryError) {
-      console.warn('Error al eliminar imagen antigua:', cloudinaryError.message);
-    }
-
-    updateData.url = result.secure_url;
+    const imagenNueva = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
+    await eliminarImagen(publicIdDeImagen(fotoExistente.imagen));
+    datosActualizados.imagen = imagenNueva;
   }
 
-  const fotoActualizada = await Foto.findByIdAndUpdate(
-    id,
-    updateData,
-    { new: true, runValidators: true }
-  );
+  const fotoActualizada = await Foto.findByIdAndUpdate(id, datosActualizados, {
+    new: true,
+    runValidators: true,
+  });
 
   res.json({
     mensaje: req.file
       ? 'Foto actualizada correctamente con nueva imagen'
       : 'Foto actualizada correctamente',
-    foto: fotoActualizada
+    foto: fotoActualizada,
   });
 });
 
-// Eliminar foto
+// Eliminar foto (borrado real) y su archivo en Cloudinary
 const deleteFoto = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  // Buscar la foto
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, 'ID de foto inválido');
+  }
+
   const foto = await Foto.findById(id);
   if (!foto) {
-    return res.status(404).json({ error: 'Foto no encontrada' });
+    throw new ApiError(404, 'Foto no encontrada');
   }
 
-  // Eliminar de Cloudinary
-  try {
-    await cloudinary.uploader.destroy(publicIdDesdeUrl(foto.url));
-  } catch (cloudinaryError) {
-    console.warn('Error al eliminar imagen de Cloudinary:', cloudinaryError.message);
-  }
-
-  // Eliminar de la base de datos
+  // Primero el archivo (por publicId) y luego el documento
+  const imagenEliminada = await eliminarImagen(publicIdDeImagen(foto.imagen));
   await Foto.findByIdAndDelete(id);
 
   res.json({
@@ -158,8 +133,8 @@ const deleteFoto = asyncHandler(async (req, res) => {
     fotoEliminada: {
       id: foto._id,
       titulo: foto.titulo,
-      imagenEliminada: true
-    }
+      imagenEliminada,
+    },
   });
 });
 
@@ -169,5 +144,5 @@ module.exports = {
   createFoto,
   updateFoto,
   deleteFoto,
-  upload
+  upload,
 };

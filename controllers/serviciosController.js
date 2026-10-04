@@ -1,70 +1,52 @@
 const Servicio = require('../models/Servicio');
-const cloudinary = require('../config/cloudinaryConfig');
-const multer = require('multer');
-const streamifier = require('streamifier'); // importar para manejar streams
+const mongoose = require('mongoose');
 const asyncHandler = require('../utils/asyncHandler');
+const ApiError = require('../utils/ApiError');
+const {
+  multerDeImagenes,
+  subirImagen,
+  eliminarImagen,
+  publicIdDeImagen,
+} = require('../utils/imagenesCloudinary');
 
-// Configurar multer para usar memoria en lugar de disco (compatible con Vercel)
-const storage = multer.memoryStorage();
+// Carpeta de Cloudinary donde viven las imágenes de servicios
+const CARPETA_CLOUDINARY = 'servicios';
 
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Solo se permiten imágenes'));
-    }
-  }
-});
+// Multer en memoria: el archivo llega como buffer y se sube a Cloudinary
+const upload = multerDeImagenes();
 
-// Subir un buffer de imagen a Cloudinary (promesa sobre upload_stream)
-const subirImagen = (buffer, folder = 'servicios') =>
-  new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream({ folder }, (error, result) => {
-      if (error) return reject(error);
-      resolve(result);
-    });
-    streamifier.createReadStream(buffer).pipe(stream);
-  });
-
-// Derivar el public_id de Cloudinary a partir de la URL guardada
-const publicIdDesdeUrl = (url) => {
-  const urlParts = url.split('/');
-  return 'servicios/' + urlParts[urlParts.length - 1].split('.')[0];
-};
-
-// Obtener todos los servicios
+// Obtener todos los servicios (más recientes primero)
 const getServicios = asyncHandler(async (req, res) => {
-  const servicios = await Servicio.find().sort({ _id: -1 }); // Más recientes primero
+  const servicios = await Servicio.find().sort({ _id: -1 });
   res.json(servicios);
 });
 
 // Obtener un servicio por ID
 const getServicioById = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    throw new ApiError(400, 'ID de servicio inválido');
+  }
   const servicio = await Servicio.findById(req.params.id);
   if (!servicio) {
-    return res.status(404).json({ error: 'Servicio no encontrado' });
+    throw new ApiError(404, 'Servicio no encontrado');
   }
   res.json(servicio);
 });
 
-// Crear nuevo servicio
+// Crear nuevo servicio (con imagen opcional)
 const createServicio = asyncHandler(async (req, res) => {
   const { nombre, titulo, descripcion } = req.body;
 
-  // Verificar si ya existe un servicio con el mismo nombre
-  const servicioExistente = await Servicio.findOne({ nombre });
-  if (servicioExistente) {
-    return res.status(400).json({ error: 'Ya existe un servicio con ese nombre' });
+  // El nombre interno no se puede repetir
+  const servicioConElMismoNombre = await Servicio.findOne({ nombre });
+  if (servicioConElMismoNombre) {
+    throw new ApiError(400, 'Ya existe un servicio con ese nombre');
   }
 
-  let imagen = '';
-  // Si hay imagen, subirla a Cloudinary
+  // Imagen: el archivo subido a Cloudinary o, si no viene archivo, ninguna
+  let imagen = { url: '', publicId: '' };
   if (req.file) {
-    const result = await subirImagen(req.file.buffer);
-    imagen = result.secure_url;
+    imagen = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
   }
 
   const nuevoServicio = new Servicio({ nombre, titulo, descripcion, imagen });
@@ -75,83 +57,72 @@ const createServicio = asyncHandler(async (req, res) => {
       ? 'Servicio creado correctamente con imagen'
       : 'Servicio creado correctamente sin imagen',
     servicio: servicioGuardado,
-    imagenSubida: !!req.file
+    imagenSubida: !!req.file,
   });
 });
 
-// Actualizar servicio
+// Actualizar servicio (textos e imagen opcional)
 const updateServicio = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { nombre, titulo, descripcion } = req.body;
 
-  // Buscar el servicio existente
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, 'ID de servicio inválido');
+  }
+
   const servicioExistente = await Servicio.findById(id);
   if (!servicioExistente) {
-    return res.status(404).json({ error: 'Servicio no encontrado' });
+    throw new ApiError(404, 'Servicio no encontrado');
   }
 
-  // Verificar si ya existe otro servicio con el mismo nombre
-  const servicioConMismoNombre = await Servicio.findOne({ nombre, _id: { $ne: id } });
-  if (servicioConMismoNombre) {
-    return res.status(400).json({ error: 'Ya existe otro servicio con ese nombre' });
+  // Verificar que no exista otro servicio con el mismo nombre
+  const otroServicioConElNombre = await Servicio.findOne({ nombre, _id: { $ne: id } });
+  if (otroServicioConElNombre) {
+    throw new ApiError(400, 'Ya existe otro servicio con ese nombre');
   }
 
-  // Preparar los datos de actualización
-  const updateData = {};
-  if (nombre) updateData.nombre = nombre;
-  if (titulo) updateData.titulo = titulo;
-  if (descripcion) updateData.descripcion = descripcion;
+  // Preparar los datos de actualización (solo los campos provistos)
+  const datosActualizados = {};
+  if (nombre) datosActualizados.nombre = nombre;
+  if (titulo) datosActualizados.titulo = titulo;
+  if (descripcion) datosActualizados.descripcion = descripcion;
 
-  // Si hay una nueva imagen, subirla y borrar la anterior
+  // Si viene una nueva imagen, subirla y borrar la anterior de Cloudinary
   if (req.file) {
-    const result = await subirImagen(req.file.buffer);
-
-    if (servicioExistente.imagen) {
-      try {
-        await cloudinary.uploader.destroy(publicIdDesdeUrl(servicioExistente.imagen));
-      } catch (cloudinaryError) {
-        console.warn('Error al eliminar imagen antigua:', cloudinaryError.message);
-      }
-    }
-
-    updateData.imagen = result.secure_url;
+    const imagenNueva = await subirImagen(req.file.buffer, CARPETA_CLOUDINARY);
+    await eliminarImagen(publicIdDeImagen(servicioExistente.imagen));
+    datosActualizados.imagen = imagenNueva;
   }
 
-  const servicioActualizado = await Servicio.findByIdAndUpdate(
-    id,
-    updateData,
-    { new: true, runValidators: true }
-  );
+  const servicioActualizado = await Servicio.findByIdAndUpdate(id, datosActualizados, {
+    new: true,
+    runValidators: true,
+  });
 
   res.json({
     mensaje: req.file
       ? 'Servicio actualizado correctamente con nueva imagen'
       : 'Servicio actualizado correctamente',
     servicio: servicioActualizado,
-    imagenActualizada: !!req.file
+    imagenActualizada: !!req.file,
   });
 });
 
-// Eliminar servicio
+// Eliminar servicio (borrado real) y su imagen en Cloudinary
 const deleteServicio = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  // Buscar el servicio
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ApiError(400, 'ID de servicio inválido');
+  }
+
   const servicio = await Servicio.findById(id);
   if (!servicio) {
-    return res.status(404).json({ error: 'Servicio no encontrado' });
+    throw new ApiError(404, 'Servicio no encontrado');
   }
 
-  // Si tiene imagen, eliminarla de Cloudinary
-  if (servicio.imagen) {
-    try {
-      await cloudinary.uploader.destroy(publicIdDesdeUrl(servicio.imagen));
-    } catch (cloudinaryError) {
-      console.warn('Error al eliminar imagen de Cloudinary:', cloudinaryError.message);
-    }
-  }
-
-  // Eliminar de la base de datos
+  // Primero el archivo (por publicId) y luego el documento
+  const imagenEliminada = await eliminarImagen(publicIdDeImagen(servicio.imagen));
   await Servicio.findByIdAndDelete(id);
 
   res.json({
@@ -159,8 +130,8 @@ const deleteServicio = asyncHandler(async (req, res) => {
     servicioEliminado: {
       id: servicio._id,
       nombre: servicio.nombre,
-      imagenEliminada: !!servicio.imagen
-    }
+      imagenEliminada,
+    },
   });
 });
 
@@ -170,5 +141,5 @@ module.exports = {
   createServicio,
   updateServicio,
   deleteServicio,
-  upload
+  upload,
 };

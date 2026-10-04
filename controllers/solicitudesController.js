@@ -76,7 +76,7 @@ const construirRenglonesDelPedido = async (productosRecibidos) => {
 
   // 2) Leer de una sola vez los productos activos que sí existen
   const productosEnBase = await Producto.find({ _id: { $in: idsDeProducto }, ...FILTRO_ACTIVOS })
-    .select('nombre imagenURL tallasDisponibles')
+    .select('nombre imagen tallasDisponibles')
     .lean();
   const productosPorId = new Map(productosEnBase.map((producto) => [String(producto._id), producto]));
 
@@ -96,7 +96,7 @@ const construirRenglonesDelPedido = async (productosRecibidos) => {
       tallaElegida,
       cantidad: normalizarCantidad(renglonRecibido.cantidad),
       nombreAlPedir: productoReal.nombre,
-      imagenAlPedir: productoReal.imagenURL || '',
+      imagenAlPedir: (productoReal.imagen && productoReal.imagen.url) || '',
     });
   }
 
